@@ -2,4 +2,9 @@
 <resources>
     <string name="hello">Hello World, ContactListView!</string>
     <string name="app_name">jmXMPP</string>
+<string name="username">Username</string>
+<string name="password">Password</string>
+<string name="server">Server</string>
+<string name="connect">Connect</string>
+<string name="no_contacts">No Contacts</string>
 </resources>

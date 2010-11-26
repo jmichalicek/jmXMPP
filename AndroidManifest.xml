@@ -4,15 +4,25 @@
       android:versionCode="1"
       android:versionName="1.0">
     <application android:icon="@drawable/icon" android:label="@string/app_name">
-        <activity android:name=".ContactListView"
-                  android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+        <activity android:name=".ContactListView" android:label="@string/app_name">
+			<intent-filter>
+				<action android:name="jm.android.jmxmpp.ContactListView" />
+				<category android:name="android.intent.category.DEFAULT" />
+			</intent-filter>
         </activity>
-
+		<activity android:name=".ChatView" />
+		<activity android:name=".ConnectView">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+		<service android:enabled="true" android:name=".service.XmppConnectionService">
+			<intent-filter>
+				<action android:name="jm.android.jmxmpp.service.XmppConnectionService" />
+			</intent-filter>
+		</service>
     </application>
     <uses-sdk android:minSdkVersion="4" />
-
+	<uses-permission android:name="android.permission.INTERNET"></uses-permission>
 </manifest> 
