@@ -10,40 +10,44 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 public class JmRosterEntry implements Parcelable {
-	String name;
-	String user;
-	String status;
-	String type;
+	String mName;
+	String mUser;
+	String mStatus;
+	String mType;
+	String mClass;
+	String mPresence;
 	
 	public JmRosterEntry() {
 		
 	}
 	
-	public JmRosterEntry(String name, String user, String status, String type) {
-		this.name = name;
-		this.user = user;
-		this.status = status;
-		this.type = type;
+	public JmRosterEntry(String name, String user, String status, String type, String presence) {
+		this.mName = name;
+		this.mUser = user;
+		this.mStatus = status;
+		this.mType = type;
+		this.mPresence = presence;
 	}
 	
 	private JmRosterEntry(Parcel p) {
 		Bundle objectBundle = p.readBundle();
-		name = objectBundle.getString("name");
-		user = objectBundle.getString("user");
-		status = objectBundle.getString("status");
-		type = objectBundle.getString("type");
+		mName = objectBundle.getString("name");
+		mUser = objectBundle.getString("user");
+		mStatus = objectBundle.getString("status");
+		mType = objectBundle.getString("type");
 
 	}
 	
 	@Override
 	public String toString() {
 		String returnData = new String();
-		if(name != null) {
-			returnData += name + "\n";
+		if(mUser != null) {
+			returnData += mUser;
 		}
-		if(user != null) {
-			returnData += user;
+		if(mName != null) {
+			returnData += ": " + mName;
 		}
+		
 		return returnData;
 	}
 
@@ -55,10 +59,10 @@ public class JmRosterEntry implements Parcelable {
 	@Override
 	public void writeToParcel(Parcel parcel, int arg1) {
 		Bundle objectBundle = new Bundle();
-		objectBundle.putString("name", name);
-		objectBundle.putString("user", user);
-		objectBundle.putString("status", status);
-		objectBundle.putString("type", type);
+		objectBundle.putString("name", mName);
+		objectBundle.putString("user", mUser);
+		objectBundle.putString("status", mStatus);
+		objectBundle.putString("type", mType);
 		
 		parcel.writeBundle(objectBundle);
 	}

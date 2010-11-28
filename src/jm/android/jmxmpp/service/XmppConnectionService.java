@@ -132,16 +132,20 @@ public class XmppConnectionService extends Service {
 				while(i.hasNext()) {
 					RosterEntry currentEntry = i.next();
 					String status = null;
-					
+
 					if(currentEntry.getStatus() != null) {
 						status = currentEntry.getStatus().toString();
 					}
 					
-					
+					Presence presence = roster.getPresence(currentEntry.getUser());
+					String p = null;
+					if(presence != null) {
+						p = presence.getStatus();
+					}
 					jm.android.jmxmpp.JmRosterEntry temp =
 						new jm.android.jmxmpp.JmRosterEntry(
 								currentEntry.getName(),currentEntry.getUser(),
-								status, null);
+								status, null,p);
 					entryList.add(temp);
 				}
 				return entryList;
