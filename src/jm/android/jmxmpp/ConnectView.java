@@ -131,7 +131,7 @@ public class ConnectView extends Activity {
 		@Override
 		protected void onPostExecute(Boolean loggedIn) {
 			progressDialog.dismiss();
-			Intent i = new Intent("jm.android.jmxmpp.ContactListView");
+			Intent i = new Intent("jm.android.jmxmpp.SHOW_CONTACT_LIST");
 			startActivity(i);
 		}
 	}

@@ -7,4 +7,5 @@
 <string name="server">Server</string>
 <string name="connect">Connect</string>
 <string name="no_contacts">No Contacts</string>
+<string name="send">Send</string>
 </resources>

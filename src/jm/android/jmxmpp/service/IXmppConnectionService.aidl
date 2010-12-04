@@ -7,4 +7,5 @@ interface IXmppConnectionService {
 	boolean login(in String username, in String password);
 	List<JmRosterEntry> getRoster();
 	void disconnect();
+	void sendMessage(in String to, in String message);
 }

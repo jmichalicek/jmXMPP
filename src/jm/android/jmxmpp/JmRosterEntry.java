@@ -15,18 +15,23 @@ public class JmRosterEntry implements Parcelable {
 	String mStatus;
 	String mType;
 	String mClass;
-	String mPresence;
+	
+	// Presence stuff may end up needing to go into its own jmPresence class
+	String mPresenceStatus;
+	String mPresenceMode;
 	
 	public JmRosterEntry() {
 		
 	}
 	
-	public JmRosterEntry(String name, String user, String status, String type, String presence) {
-		this.mName = name;
-		this.mUser = user;
-		this.mStatus = status;
-		this.mType = type;
-		this.mPresence = presence;
+	public JmRosterEntry(String name, String user, String status, String type,
+			String presenceStatus, String presenceMode) {
+		mName = name;
+		mUser = user;
+		mStatus = status;
+		mType = type;
+		mPresenceStatus = presenceStatus;
+		mPresenceMode = presenceMode;
 	}
 	
 	private JmRosterEntry(Parcel p) {
@@ -35,8 +40,12 @@ public class JmRosterEntry implements Parcelable {
 		mUser = objectBundle.getString("user");
 		mStatus = objectBundle.getString("status");
 		mType = objectBundle.getString("type");
+		mPresenceStatus = objectBundle.getString("presence_status");
+		mPresenceMode = objectBundle.getString("presence_mode");
+		
 
 	}
+	
 	
 	@Override
 	public String toString() {
@@ -63,6 +72,8 @@ public class JmRosterEntry implements Parcelable {
 		objectBundle.putString("user", mUser);
 		objectBundle.putString("status", mStatus);
 		objectBundle.putString("type", mType);
+		objectBundle.putString("presence_status", mPresenceStatus);
+		objectBundle.putString("presence_mode", mPresenceMode);
 		
 		parcel.writeBundle(objectBundle);
 	}
