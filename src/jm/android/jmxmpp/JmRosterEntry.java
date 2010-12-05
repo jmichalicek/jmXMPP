@@ -16,7 +16,8 @@ public class JmRosterEntry implements Parcelable {
 	String mType;
 	String mClass;
 	
-	// Presence stuff may end up needing to go into its own jmPresence class
+	// Presence stuff may be better in its own jmPresence class
+	// but keep it simple for now, it's just 2 strings
 	String mPresenceStatus;
 	String mPresenceMode;
 	
@@ -46,7 +47,29 @@ public class JmRosterEntry implements Parcelable {
 
 	}
 	
+	public String getName() {
+		return mName;
+	}
 	
+	public String getUser() {
+		return mUser;
+	}
+	
+	public String getStatus() {
+		return mStatus;
+	}
+	
+	public String getType() {
+		return mType;
+	}
+	
+	public String getPresenceMode() {
+		return mPresenceMode;
+	}
+	
+	public String getPresenceStatus() {
+		return mPresenceStatus;
+	}
 	@Override
 	public String toString() {
 		String returnData = new String();

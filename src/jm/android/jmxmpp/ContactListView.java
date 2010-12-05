@@ -26,14 +26,16 @@ import android.widget.AdapterView.OnItemClickListener;
 public class ContactListView extends ListActivity {
 	IXmppConnectionService mConnectionService = null;
 	ArrayAdapter<String> mRosterArrayAdapter = null;
-	List<JmRosterEntry> mRosterList = null; // parallel to ArrayAdapter
+ 	List<JmRosterEntry> mRosterList = null; // parallel to ArrayAdapter
 	
 	private static final Comparator<JmRosterEntry> ROSTER_NAME_ORDER =
 		new Comparator<JmRosterEntry>() {
 			@Override
 			public int compare(JmRosterEntry arg0, JmRosterEntry arg1) {
-				String compare1 = (arg0.mName != null) ? arg0.mName : arg0.mUser;
-				String compare2 = (arg1.mName != null) ? arg1.mName : arg1.mUser;
+				String compare1 = (arg0.getName() != null) ? arg0.getName()
+						: arg0.getUser();
+				String compare2 = (arg1.getName() != null) ? arg1.getName()
+						: arg1.getUser();
 				return compare1.compareToIgnoreCase(compare2);
 			}
 	};
@@ -49,7 +51,9 @@ public class ContactListView extends ListActivity {
 				new IntentFilter("jm.android.jmxmpp.ROSTER_UPDATED"));
 		
 		ListView rosterListView = (ListView)findViewById(android.R.id.list);
-		rosterListView.setOnItemClickListener(rosterItemClicked);		
+		rosterListView.setOnItemClickListener(rosterItemClicked);
+		
+		setListAdapter(mRosterArrayAdapter);
 	}
 
 	private ServiceConnection mConnection = new ServiceConnection() {
@@ -131,41 +135,32 @@ public class ContactListView extends ListActivity {
 		
 		@Override
 		protected void onPostExecute(Void a) {
-			ListView rosterListView = (ListView)findViewById(android.R.id.list);
 			mRosterArrayAdapter.clear();
 
-			//new stuff
-			//ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(this,R.layout.roster_row);
 			Iterator<JmRosterEntry> i = mRosterList.iterator();
 			while(i.hasNext()) {
 				JmRosterEntry current = i.next();
 				String rosterString = new String();
 				
-				if(current.mName != null) {
-					rosterString = current.mName;
+				if(current.getName() != null) {
+					rosterString = current.getName();
 				} else {
-					rosterString = current.mUser;
+					rosterString = current.getUser();
 				}
 				
-				Boolean statusSet = false;
-				if(current.mPresenceStatus != null) {
-					rosterString += "\n" + current.mPresenceStatus;
-					statusSet = true;
+				String statusLine = null;
+				statusLine = (current.getPresenceStatus() != null) ? 
+						(!current.getPresenceStatus().equals("") ?
+								current.getPresenceStatus() : "Online") : "Offline";
+				
+				if(current.getPresenceMode() != null) {
+					statusLine += " - " + current.getPresenceMode();
 				}
 				
-				if(current.mPresenceMode != null) {
-					if(statusSet) {
-						rosterString += " - ";
-					} else {
-						rosterString += "\n";
-					}
-					
-					rosterString += current.mPresenceMode;
-				}
+				rosterString += "\n" + statusLine;
 				
 				mRosterArrayAdapter.add(rosterString);
 			}
-			rosterListView.setAdapter(mRosterArrayAdapter);
 		}
 		
 	}

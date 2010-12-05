@@ -21,7 +21,7 @@
 		
 	<!--  really need to wrap this TextView in another layout
 		with some sort of border so that it looks nice -->
-	<TextView
+	<TextView android:id="@+id/chat_messages"
 		android:layout_width="fill_parent"
 		android:layout_height="fill_parent"
 		android:layout_above="@+id/send_message_input"

@@ -7,7 +7,10 @@ import java.util.List;
 
 import jm.android.jmxmpp.JmRosterEntry;
 
+import android.app.Activity;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -45,6 +48,7 @@ public class XmppConnectionService extends Service {
 	public void onStart(Intent intent, int startid) {
 		//onStart deprecated sometime after android 1.6
 		//and replaced with onStartCommand()
+		mConnection.DEBUG_ENABLED = true;
 	}
 	
 	@Override
@@ -53,10 +57,11 @@ public class XmppConnectionService extends Service {
 	}
 	
 	private RosterEntry findRosterEntryByUser(String user) {
+		String temp = user.split("/", 2)[0];
 		Iterator<RosterEntry> i = mRoster.getEntries().iterator();
 		while(i.hasNext()) {
 			RosterEntry current = i.next();
-			if(current.getUser() == user) {
+			if(current.getUser().equals(temp)) {
 				return current;
 			}
 		}
@@ -64,16 +69,28 @@ public class XmppConnectionService extends Service {
 	}
 	
 	// Listeners
+	BroadcastReceiver sendMessageResultReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context arg0, Intent intent) {
+			if(getResultCode() != Activity.RESULT_OK) {
+				//Display notification... do something so that the message is
+				//made available whenever the user opens the notification
+			}
+		}		
+	};
+	
 	ChatManagerListener chatManagerListener = new ChatManagerListener() {
 		@Override
 		public void chatCreated(Chat arg0, boolean createdLocally) {
-			if(!createdLocally) {
-				RosterEntry re = findRosterEntryByUser(arg0.getParticipant());
+				//RosterEntry re = findRosterEntryByUser(arg0.getParticipant());
 				//TODO: Handle chat from people NOT in the roster
-				if(re == null) {
-					return;
-				}
+				//if(re == null) {
+				//	return;
+				//}
 				
+				arg0.addMessageListener(messageListener);
+				
+				/*
 				String status = null;
 
 				if(re.getStatus() != null) {
@@ -91,24 +108,65 @@ public class XmppConnectionService extends Service {
 				JmRosterEntry creator = new JmRosterEntry(re.getName(),
 						re.getStatus().toString(),
 						status,null,pStatus,pMode);
-				
+				*/
 				//TODO: This should ask if we want to chat with this person
 				// not just pop up the chat activity.  For the moment the app
 				// will be rude about it, though.
-				Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
+				/*Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
 				i.putExtra("thread_id", arg0.getThreadID());
 				i.putExtra("participant", creator);
 				
-				startActivity(i);
-			}
+				startActivity(i);*/
+				
+				//Intent i = new Intent();
+				//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
+				//i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
+				//i.putExtra("from", creator);
+				//i.putExtra("message",message.getBody());
+				//sendBroadcast(i);
 		}
 	};
-	
+
 	MessageListener messageListener = new MessageListener() {
 		@Override
 		public void processMessage(Chat chat, Message message) {
-			
-		}		
+			if(message.getType() == Message.Type.chat || true) {
+				RosterEntry re = findRosterEntryByUser(chat.getParticipant());
+				//TODO: Handle chat from people NOT in the roster
+				if(re == null) {
+					return;
+				}
+				
+				String status = null;
+
+				if(re.getStatus() != null) {
+					status = re.getStatus().toString();
+				}
+
+				Presence presence = mRoster.getPresence(re.getUser());
+				String pStatus = null;
+				String pMode = null;
+				if(presence != null) {
+					pStatus = presence.getStatus();
+					pMode = presence.getMode() == null ? null : presence.getMode().toString();
+				}
+
+				JmRosterEntry participant = new JmRosterEntry(re.getName(),
+						re.getUser(),
+						status,null,pStatus,pMode);
+				
+				Intent i = new Intent();
+				//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
+				i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
+				i.putExtra("from", participant);
+				i.putExtra("message",message.getBody());
+				//sendBroadcast(i);
+				// Send broadcast and epect result back.  If no result then
+				// then an appropriate activity is not alive and we should show a notification
+				sendOrderedBroadcast(i,null,sendMessageResultReceiver,null,
+						Activity.RESULT_CANCELED,null,null);
+			}
+		}
 	};
 	
 	RosterListener rosterListener = new RosterListener() {
@@ -203,6 +261,8 @@ public class XmppConnectionService extends Service {
 		        mRoster = mConnection.getRoster();
 		        mRoster.addRosterListener(rosterListener);
 		        
+		        mConnection.getChatManager().addChatListener(chatManagerListener);
+		        
 		        return true;
 			}
 			
@@ -245,7 +305,8 @@ public class XmppConnectionService extends Service {
 			@Override
 			public void sendMessage(String to, String message) throws RemoteException {
 				Chat chat = mConnection.getChatManager().createChat(to,
-						messageListener);
+						null);
+				
 				try {
 					chat.sendMessage(message);
 				} catch (XMPPException ex) {
