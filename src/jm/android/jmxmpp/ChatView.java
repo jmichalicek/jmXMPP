@@ -1,7 +1,10 @@
 package jm.android.jmxmpp;
 /**
  * Currently only handles single user chat, no file transfers, etc.
+ * May need some reworking for MUC
  */
+
+import java.util.List;
 
 import jm.android.jmxmpp.service.IXmppConnectionService;
 import android.app.Activity;
@@ -50,22 +53,78 @@ public class ChatView extends Activity {
 		
 	}
 	
+	@Override
+	protected void onRestoreInstanceState(Bundle savedInstanceState){
+		this.mParticipant = savedInstanceState.getParcelable("participant");
+		this.chatMessages.setText(savedInstanceState.getString("messages"));
+		
+		super.onRestoreInstanceState(savedInstanceState);
+	}
+	
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		outState.putParcelable("participant", mParticipant);
+		outState.putString("messages", chatMessages.getText().toString());
+		super.onSaveInstanceState(outState);
+	}
+	
+	@Override
+	protected void onStop() {
+		super.onStop();
+		//for now just save the whole current message log as a single
+		//string.  It may turn out to be better to save separate strings per message
+		try {
+			mConnectionService.addMessagesToQueue(mParticipant.getUser(), new String[] {chatMessages.getText().toString()});
+		} catch (RemoteException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 	private void unBundle(Intent intent) {
 		Bundle data = intent.getExtras();
 		if(data != null) {
 			mParticipant = data.getParcelable("participant");
 		}
 	}
-	
+
 	private void connectToXmppService() {
 		bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
 				mConnection,Context.BIND_AUTO_CREATE);
 	}
-	
+
 	private ServiceConnection mConnection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName className, IBinder service) {
 			mConnectionService = IXmppConnectionService.Stub.asInterface(service);
+
+			if(mConnectionService != null) {
+				try {
+					List<String> queuedMessages = 
+						mConnectionService.getQueuedMessages(mParticipant.getUser());
+
+					if(queuedMessages != null) {
+						for(String currentMessage:queuedMessages) {
+							String sender = (mParticipant.getName() != null) ?
+									mParticipant.getName() : mParticipant.getUser();
+
+							chatMessages.append(sender + ": ");
+							chatMessages.append(currentMessage);
+							chatMessages.append("\n\n");
+						}
+					}
+				} catch (RemoteException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				try {
+					mConnectionService.clearQueuedMessages(mParticipant.getUser());
+				} catch (RemoteException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
 		}
 
 		@Override
@@ -128,13 +187,11 @@ public class ChatView extends Activity {
 		
 		@Override
 		protected void onPostExecute(Void unused)  {
-			chatMessages.setTextColor(Color.GREEN);
 			chatMessages.append("Me: ");
-			chatMessages.setTextColor(Color.WHITE);
 			chatMessages.append(messageEntry.getText().toString());
 			chatMessages.append("\n\n");
 			
-			messageEntry.clearComposingText();
+			messageEntry.setText(null);
 		}
 	};
 }

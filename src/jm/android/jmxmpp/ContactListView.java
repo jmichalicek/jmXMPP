@@ -1,7 +1,16 @@
 package jm.android.jmxmpp;
 
+/*TODO:
+ * Main menu - add to roster, filter all/online only/groups
+ * Context menu per entry - delete, start chat, view chat history... add to MUC?
+ * Try to find a way to launch new ChatView instance for chat per user, but re-use
+ * the existing instance for all chats with a particular user... HashMap<jid,intent> maybe?
+ */
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -19,14 +28,16 @@ import android.os.IBinder;
 import android.os.RemoteException;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.SimpleAdapter;
 import android.widget.AdapterView.OnItemClickListener;
 
 public class ContactListView extends ListActivity {
+	
 	IXmppConnectionService mConnectionService = null;
-	ArrayAdapter<String> mRosterArrayAdapter = null;
  	List<JmRosterEntry> mRosterList = null; // parallel to ArrayAdapter
+ 	List<HashMap<String,String>> mRosterDisplayList = new ArrayList<HashMap<String,String>>();
+ 	private SimpleAdapter mRosterAdapter = null;
 	
 	private static final Comparator<JmRosterEntry> ROSTER_NAME_ORDER =
 		new Comparator<JmRosterEntry>() {
@@ -44,7 +55,13 @@ public class ContactListView extends ListActivity {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.roster_view);
-		mRosterArrayAdapter = new ArrayAdapter<String>(this,R.layout.roster_row);
+		
+		mRosterAdapter = new SimpleAdapter(this,mRosterDisplayList,
+				android.R.layout.simple_list_item_2,
+				new String[] {"text1","text2"},
+				new int[] {android.R.id.text1,android.R.id.text2}
+		);
+		
 		connectToXmppService();
 		
 		registerReceiver(rosterUpdatedReceiver,
@@ -53,7 +70,8 @@ public class ContactListView extends ListActivity {
 		ListView rosterListView = (ListView)findViewById(android.R.id.list);
 		rosterListView.setOnItemClickListener(rosterItemClicked);
 		
-		setListAdapter(mRosterArrayAdapter);
+		setListAdapter(mRosterAdapter);
+		
 	}
 
 	private ServiceConnection mConnection = new ServiceConnection() {
@@ -85,10 +103,10 @@ public class ContactListView extends ListActivity {
 	 * Launches intent for new chat activity with selected user
 	 */
 	private void startChat(int position) {
-		Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
-		i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
-		i.putExtra("participant", this.mRosterList.get(position));
-		startActivity(i);
+			Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
+			i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
+			i.putExtra("participant", this.mRosterList.get(position));
+			startActivity(i);
 	}
 	
 	//Listeners
@@ -135,18 +153,11 @@ public class ContactListView extends ListActivity {
 		
 		@Override
 		protected void onPostExecute(Void a) {
-			mRosterArrayAdapter.clear();
+			mRosterDisplayList.clear();
 
 			Iterator<JmRosterEntry> i = mRosterList.iterator();
 			while(i.hasNext()) {
 				JmRosterEntry current = i.next();
-				String rosterString = new String();
-				
-				if(current.getName() != null) {
-					rosterString = current.getName();
-				} else {
-					rosterString = current.getUser();
-				}
 				
 				String statusLine = null;
 				statusLine = (current.getPresenceStatus() != null) ? 
@@ -157,9 +168,12 @@ public class ContactListView extends ListActivity {
 					statusLine += " - " + current.getPresenceMode();
 				}
 				
-				rosterString += "\n" + statusLine;
-				
-				mRosterArrayAdapter.add(rosterString);
+				HashMap<String,String> entry = new HashMap<String,String>();
+				entry.put("text1", (current.getName() != null) ?
+						current.getName() : current.getUser());
+				entry.put("text2", statusLine);
+				mRosterDisplayList.add(entry);
+				mRosterAdapter.notifyDataSetChanged();
 			}
 		}
 		

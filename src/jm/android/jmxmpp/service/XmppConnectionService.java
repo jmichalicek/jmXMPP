@@ -2,16 +2,21 @@ package jm.android.jmxmpp.service;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
 import jm.android.jmxmpp.JmRosterEntry;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 
@@ -31,8 +36,16 @@ public class XmppConnectionService extends Service {
 
 	private XMPPConnection mConnection;
 	private ConnectionConfiguration mConnConfig;
-	private Roster mRoster;
+	private Roster mRoster;	
+	private NotificationManager mNotificationManager = null;
 	
+	//Stores messages when there was no proper BroadcastReceiver
+	//so that a ChatView can display them later
+	//this may need revisited to deal properly with MUC
+	private HashMap<String,List<String>> mQueuedMessages = new HashMap<String,List<String>>();
+	
+	private static final int NOTIFICATION_NEW_MESSAGE = 1;
+
 	@Override
 	public IBinder onBind(Intent arg0) {
 		return mBinder;
@@ -48,7 +61,10 @@ public class XmppConnectionService extends Service {
 	public void onStart(Intent intent, int startid) {
 		//onStart deprecated sometime after android 1.6
 		//and replaced with onStartCommand()
-		mConnection.DEBUG_ENABLED = true;
+		
+		String ns = Context.NOTIFICATION_SERVICE;
+		mNotificationManager = (NotificationManager)getSystemService(ns);
+
 	}
 	
 	@Override
@@ -68,6 +84,14 @@ public class XmppConnectionService extends Service {
 		return null;
 	}
 	
+	private void queueMessage(String user, String message) {
+		if(!mQueuedMessages.containsKey(user)) {
+			mQueuedMessages.put(user, new ArrayList<String>());
+		}
+		
+		mQueuedMessages.get(user).add(message);
+	}
+	
 	// Listeners
 	BroadcastReceiver sendMessageResultReceiver = new BroadcastReceiver() {
 		@Override
@@ -75,8 +99,48 @@ public class XmppConnectionService extends Service {
 			if(getResultCode() != Activity.RESULT_OK) {
 				//Display notification... do something so that the message is
 				//made available whenever the user opens the notification
+				JmRosterEntry messageFrom = null;
+				String message = null;
+				Bundle data = intent.getExtras();
+				if(data != null) {
+					messageFrom = data.getParcelable("from");
+					message = data.getString("message");
+				}
+				
+				queueMessage(messageFrom.getUser(),message);
+				
+				int icon = android.R.drawable.sym_action_chat;
+				CharSequence tickerText = "New XMPP Message";
+				long when = System.currentTimeMillis();
+				Notification notification = new Notification(icon, tickerText, when);
+				notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE |
+					Notification.FLAG_AUTO_CANCEL;
+				
+				CharSequence contentTitle = "New jmXMPP Message from " + messageFrom.getUser();
+				int messageLength = 15;
+				if(message.length() <= 15) {
+					messageLength = message.length();
+				}
+				CharSequence contentText = message.subSequence(0, messageLength);
+				
+				Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
+				i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
+				i.putExtra("participant", messageFrom);
+
+				Context context = getApplicationContext();
+				PendingIntent contentIntent = PendingIntent.getActivity(
+						XmppConnectionService.this, 0, i, 0);
+				notification.setLatestEventInfo(context, contentTitle, contentText, contentIntent);
+
+				//Use the hashcode of the message sender's user id
+				//so that there's a unique id per message source.  This way
+				//there will be a new notification per new source, but if that source
+				//sends multiple messages, the notification for them will just update
+				//with the latest message
+				int notificationId = messageFrom.getUser().hashCode();
+				mNotificationManager.notify(notificationId, notification);
 			}
-		}		
+		}
 	};
 	
 	ChatManagerListener chatManagerListener = new ChatManagerListener() {
@@ -130,45 +194,43 @@ public class XmppConnectionService extends Service {
 	MessageListener messageListener = new MessageListener() {
 		@Override
 		public void processMessage(Chat chat, Message message) {
-			if(message.getType() == Message.Type.chat || true) {
+			if(message.getType() == Message.Type.chat) {
 				RosterEntry re = findRosterEntryByUser(chat.getParticipant());
 				//TODO: Handle chat from people NOT in the roster
-				if(re == null) {
-					return;
-				}
-				
-				String status = null;
+				if(re != null) {
+					String status = null;
+					if(re.getStatus() != null) {
+						status = re.getStatus().toString();
+					}
 
-				if(re.getStatus() != null) {
-					status = re.getStatus().toString();
-				}
+					Presence presence = mRoster.getPresence(re.getUser());
+					String pStatus = null;
+					String pMode = null;
+					if(presence != null) {
+						pStatus = presence.getStatus();
+						pMode = presence.getMode() == null ? null : presence.getMode().toString();
+					}
 
-				Presence presence = mRoster.getPresence(re.getUser());
-				String pStatus = null;
-				String pMode = null;
-				if(presence != null) {
-					pStatus = presence.getStatus();
-					pMode = presence.getMode() == null ? null : presence.getMode().toString();
-				}
+					JmRosterEntry participant = new JmRosterEntry(re.getName(),
+							re.getUser(),
+							status,null,pStatus,pMode);
 
-				JmRosterEntry participant = new JmRosterEntry(re.getName(),
-						re.getUser(),
-						status,null,pStatus,pMode);
-				
-				Intent i = new Intent();
-				//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
-				i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
-				i.putExtra("from", participant);
-				i.putExtra("message",message.getBody());
-				//sendBroadcast(i);
-				// Send broadcast and epect result back.  If no result then
-				// then an appropriate activity is not alive and we should show a notification
-				sendOrderedBroadcast(i,null,sendMessageResultReceiver,null,
-						Activity.RESULT_CANCELED,null,null);
+					Intent i = new Intent();
+					//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
+					i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
+					i.putExtra("from", participant);
+					i.putExtra("message",message.getBody());
+					// Send broadcast and expect result back.  If no result then
+					// then an appropriate activity is not alive and we should show a notification
+					sendOrderedBroadcast(i,null,sendMessageResultReceiver,null,
+							Activity.RESULT_CANCELED,null,null);
+				} else {
+					//What to do if they're not on the roster?
+				}
 			}
 		}
 	};
-	
+
 	RosterListener rosterListener = new RosterListener() {
 		/*
 		 * The way these are implemented could get slow if someone has a huge
@@ -316,6 +378,37 @@ public class XmppConnectionService extends Service {
 		        	e.initCause(ex);
 		        	throw e;
 				}
+			}
+
+			@Override
+			public void clearQueuedMessages(String from) throws RemoteException {
+				mQueuedMessages.remove(from);
+				
+			}
+
+			@Override
+			public List<String> getQueuedMessages(String from)
+					throws RemoteException {
+				if(mQueuedMessages.containsKey(from)) {
+					return mQueuedMessages.get(from);
+				}
+				return null;
+			}
+
+			@Override
+			public void addMessagesToQueue(String from, String[] messages)
+					throws RemoteException {
+				List<String> messageList = new ArrayList<String>();
+				
+				if(mQueuedMessages.containsKey(from)) {
+					messageList = mQueuedMessages.get(from);
+				}
+				
+				for(String message: messages) {
+					messageList.add(message);
+				}
+				
+				mQueuedMessages.put(from, messageList);
 			}
 
 	};

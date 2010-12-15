@@ -8,4 +8,7 @@ interface IXmppConnectionService {
 	List<JmRosterEntry> getRoster();
 	void disconnect();
 	void sendMessage(in String to, in String message);
+	List<String> getQueuedMessages(in String from);
+	void clearQueuedMessages(in String from);
+	void addMessagesToQueue(in String from, in String[] messages);
 }

@@ -10,14 +10,14 @@
   <EditText android:id="@+id/username_entry"
   	android:layout_width="fill_parent"
   	android:layout_height="wrap_content"
-  />
+  android:inputType="text"/>
   <TextView android:text="@string/password"
   	android:layout_width="wrap_content"
   	android:layout_height="wrap_content"
   />
   <EditText android:id="@+id/password_entry"
   	android:layout_width="fill_parent"
-  	android:layout_height="wrap_content"/>
+  	android:layout_height="wrap_content" android:inputType="text"/>
 	<Button android:id="@+id/connect_button" android:layout_width="wrap_content"
 		android:layout_height="wrap_content" android:text="@string/connect"
 		android:layout_alignParentRight="true" />
