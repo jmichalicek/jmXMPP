@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
+import jm.android.jmxmpp.JmMessage;
 import jm.android.jmxmpp.JmRosterEntry;
 
 import android.app.Activity;
@@ -42,9 +43,10 @@ public class XmppConnectionService extends Service {
 	//Stores messages when there was no proper BroadcastReceiver
 	//so that a ChatView can display them later
 	//this may need revisited to deal properly with MUC
-	private HashMap<String,List<String>> mQueuedMessages = new HashMap<String,List<String>>();
-	
-	private static final int NOTIFICATION_NEW_MESSAGE = 1;
+	//uses who our conversation is with as the key and then uses JmMessage
+	//because the actual message being stored could be from ourselves TO the person
+	//we are chatting with.
+	private HashMap<String,List<JmMessage>> mQueuedMessages = new HashMap<String,List<JmMessage>>();
 
 	@Override
 	public IBinder onBind(Intent arg0) {
@@ -84,9 +86,9 @@ public class XmppConnectionService extends Service {
 		return null;
 	}
 	
-	private void queueMessage(String user, String message) {
+	private void queueMessage(String user, JmMessage message) {
 		if(!mQueuedMessages.containsKey(user)) {
-			mQueuedMessages.put(user, new ArrayList<String>());
+			mQueuedMessages.put(user, new ArrayList<JmMessage>());
 		}
 		
 		mQueuedMessages.get(user).add(message);
@@ -97,18 +99,16 @@ public class XmppConnectionService extends Service {
 		@Override
 		public void onReceive(Context arg0, Intent intent) {
 			if(getResultCode() != Activity.RESULT_OK) {
-				//Display notification... do something so that the message is
-				//made available whenever the user opens the notification
 				JmRosterEntry messageFrom = null;
-				String message = null;
+				JmMessage message = null;
 				Bundle data = intent.getExtras();
 				if(data != null) {
 					messageFrom = data.getParcelable("from");
-					message = data.getString("message");
+					message = data.getParcelable("message");
 				}
 				
 				queueMessage(messageFrom.getUser(),message);
-				
+				String messageText = message.getText();
 				int icon = android.R.drawable.sym_action_chat;
 				CharSequence tickerText = "New XMPP Message";
 				long when = System.currentTimeMillis();
@@ -118,10 +118,10 @@ public class XmppConnectionService extends Service {
 				
 				CharSequence contentTitle = "New jmXMPP Message from " + messageFrom.getUser();
 				int messageLength = 15;
-				if(message.length() <= 15) {
-					messageLength = message.length();
+				if(messageText.length() <= 15) {
+					messageLength = messageText.length();
 				}
-				CharSequence contentText = message.subSequence(0, messageLength);
+				CharSequence contentText = messageText.subSequence(0, messageLength);
 				
 				Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
 				i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
@@ -218,8 +218,14 @@ public class XmppConnectionService extends Service {
 					Intent i = new Intent();
 					//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
 					i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
+					// A bit redundant due to the JmMessage but for now
+					// just make it work, it's not a huge problem
 					i.putExtra("from", participant);
-					i.putExtra("message",message.getBody());
+					//i.putExtra("message",message.getBody());
+					String sender = (participant.getName() != null) ?
+							participant.getName() : participant.getUser();
+					i.putExtra("message", 
+							new JmMessage(sender,message.getBody()));
 					// Send broadcast and expect result back.  If no result then
 					// then an appropriate activity is not alive and we should show a notification
 					sendOrderedBroadcast(i,null,sendMessageResultReceiver,null,
@@ -387,7 +393,7 @@ public class XmppConnectionService extends Service {
 			}
 
 			@Override
-			public List<String> getQueuedMessages(String from)
+			public List<JmMessage> getQueuedMessages(String from)
 					throws RemoteException {
 				if(mQueuedMessages.containsKey(from)) {
 					return mQueuedMessages.get(from);
@@ -396,15 +402,15 @@ public class XmppConnectionService extends Service {
 			}
 
 			@Override
-			public void addMessagesToQueue(String from, String[] messages)
+			public void addMessagesToQueue(String from, JmMessage[] messages)
 					throws RemoteException {
-				List<String> messageList = new ArrayList<String>();
+				List<JmMessage> messageList = new ArrayList<JmMessage>();
 				
 				if(mQueuedMessages.containsKey(from)) {
 					messageList = mQueuedMessages.get(from);
 				}
 				
-				for(String message: messages) {
+				for(JmMessage message: messages) {
 					messageList.add(message);
 				}
 				

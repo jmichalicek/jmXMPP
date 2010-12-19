@@ -21,11 +21,26 @@
 		
 	<!--  really need to wrap this TextView in another layout
 		with some sort of border so that it looks nice -->
+		<!-- 
 	<TextView android:id="@+id/chat_messages"
 		android:layout_width="fill_parent"
 		android:layout_height="fill_parent"
 		android:layout_above="@+id/send_message_input"
 		android:layout_alignParentLeft="true"
 		android:linksClickable="true" android:isScrollContainer="true"/>
+		-->
+	<ListView
+		android:id="@+id/chat_messages"
+		android:layout_width="fill_parent"
+		android:layout_height="fill_parent"
+		android:layout_above="@+id/send_message_input"
+		android:layout_alignParentLeft="true"
+		android:linksClickable="true"
+		android:isScrollContainer="true"
+		/>
+	<TextView android:id="@android:id/empty"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text=""/>
 
 </RelativeLayout>

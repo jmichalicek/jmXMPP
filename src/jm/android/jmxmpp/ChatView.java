@@ -4,6 +4,9 @@ package jm.android.jmxmpp;
  * May need some reworking for MUC
  */
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 import jm.android.jmxmpp.service.IXmppConnectionService;
@@ -14,7 +17,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.graphics.Color;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -23,14 +25,18 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
+import android.widget.ListView;
+import android.widget.SimpleAdapter;
 
 public class ChatView extends Activity {
 	IXmppConnectionService mConnectionService = null;
 	//Just single user chat for now
 	JmRosterEntry mParticipant = null;
 	EditText messageEntry = null;
-	TextView chatMessages = null;
+	ListView chatMessages = null;
+	
+	SimpleAdapter mChatAdapter = null;
+	List<HashMap<String,String>> mChatList = new ArrayList<HashMap<String,String>>();
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -43,10 +49,21 @@ public class ChatView extends Activity {
 			unBundle(i);
 		}
 	
-		chatMessages = (TextView)findViewById(R.id.chat_messages);
+		//chatMessages = (TextView)findViewById(R.id.chat_messages);
+		chatMessages = (ListView)findViewById(R.id.chat_messages);
 		messageEntry = (EditText)findViewById(R.id.send_message_input);
 		Button sendButton = (Button)findViewById(R.id.send_message_button);
 		sendButton.setOnClickListener(sendButtonClickListener);
+		
+		//new
+		mChatAdapter = new SimpleAdapter(this,mChatList,
+				R.layout.chat_row,
+				new String[] {"from","message"},
+				new int[] {R.id.chat_message_from,R.id.chat_message}
+		);
+		//end new
+		
+		chatMessages.setAdapter(mChatAdapter);
 		
 		registerReceiver(messageBroadcastListener,
 				new IntentFilter("jm.android.jmxmpp.INCOMING_MESSAGE"));
@@ -56,7 +73,7 @@ public class ChatView extends Activity {
 	@Override
 	protected void onRestoreInstanceState(Bundle savedInstanceState){
 		this.mParticipant = savedInstanceState.getParcelable("participant");
-		this.chatMessages.setText(savedInstanceState.getString("messages"));
+		//this.chatMessages.setText(savedInstanceState.getString("messages"));
 		
 		super.onRestoreInstanceState(savedInstanceState);
 	}
@@ -64,19 +81,36 @@ public class ChatView extends Activity {
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
 		outState.putParcelable("participant", mParticipant);
-		outState.putString("messages", chatMessages.getText().toString());
+		//outState.putString("messages", chatMessages.getText().toString());
 		super.onSaveInstanceState(outState);
 	}
 	
 	@Override
 	protected void onStop() {
 		super.onStop();
-		//for now just save the whole current message log as a single
-		//string.  It may turn out to be better to save separate strings per message
+
+		JmMessage[] messages = new JmMessage[mChatList.size()];
+		Iterator<HashMap<String,String>> i = mChatList.iterator();
+		int x = 0;
+		while(i.hasNext()) {
+			HashMap<String,String> m = i.next();
+			//Strip the ": " off of the end of from
+			//or when the user re-opens the chat they see <sender>: : <message
+			//instead of the desired <sender>: <message>
+			//This could also be resolved with a parallel array of JmMessage
+			//to iterate over for things like this
+			String from = m.get("from");
+			from = from.substring(0, from.lastIndexOf(": "));
+			messages[x] = new JmMessage(from,m.get("message"));
+			x++;
+		}
+		
 		try {
-			mConnectionService.addMessagesToQueue(mParticipant.getUser(), new String[] {chatMessages.getText().toString()});
+			mConnectionService.addMessagesToQueue(mParticipant.getUser(), messages);
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
@@ -92,6 +126,14 @@ public class ChatView extends Activity {
 		bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
 				mConnection,Context.BIND_AUTO_CREATE);
 	}
+	
+	private void addMessageToView(JmMessage message) {
+		HashMap<String,String> incomingMessage = new HashMap<String,String>();
+		incomingMessage.put("from", message.getFrom() + ": ");
+		incomingMessage.put("message",message.getText());
+		mChatList.add(incomingMessage); 
+		mChatAdapter.notifyDataSetChanged();
+	}
 
 	private ServiceConnection mConnection = new ServiceConnection() {
 		@Override
@@ -100,17 +142,12 @@ public class ChatView extends Activity {
 
 			if(mConnectionService != null) {
 				try {
-					List<String> queuedMessages = 
+					List<JmMessage> queuedMessages = 
 						mConnectionService.getQueuedMessages(mParticipant.getUser());
 
 					if(queuedMessages != null) {
-						for(String currentMessage:queuedMessages) {
-							String sender = (mParticipant.getName() != null) ?
-									mParticipant.getName() : mParticipant.getUser();
-
-							chatMessages.append(sender + ": ");
-							chatMessages.append(currentMessage);
-							chatMessages.append("\n\n");
+						for(JmMessage currentMessage:queuedMessages) {
+							addMessageToView(currentMessage);
 						}
 					}
 				} catch (RemoteException e) {
@@ -153,16 +190,8 @@ public class ChatView extends Activity {
 					return;
 				}
 				
-				String message = data.getString("message");
-				String sender = (mParticipant.getName() != null) ? mParticipant.getName()
-						: mParticipant.getUser();
-				
-				chatMessages.setTextColor(Color.GREEN);
-				chatMessages.append(sender + ": ");
-				chatMessages.setTextColor(Color.WHITE);
-				chatMessages.append(message);
-				chatMessages.append("\n\n");
-				
+				JmMessage message = data.getParcelable("message");
+				addMessageToView(message);
 				setResultCode(Activity.RESULT_OK);
 			}
 		}
@@ -187,10 +216,8 @@ public class ChatView extends Activity {
 		
 		@Override
 		protected void onPostExecute(Void unused)  {
-			chatMessages.append("Me: ");
-			chatMessages.append(messageEntry.getText().toString());
-			chatMessages.append("\n\n");
-			
+			JmMessage message = new JmMessage("Me",messageEntry.getText().toString());
+			addMessageToView(message);
 			messageEntry.setText(null);
 		}
 	};
