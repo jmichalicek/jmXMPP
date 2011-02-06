@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hello">Hello World, ContactListView!</string>
+    
     <string name="app_name">jmXMPP</string>
 <string name="username">Username</string>
 <string name="password">Password</string>
@@ -8,4 +8,9 @@
 <string name="connect">Connect</string>
 <string name="no_contacts">No Contacts</string>
 <string name="send">Send</string>
+<string name="save_username">Save Username</string>
+<string name="save_password">Save Password</string>
+<string name="xmpp_server">XMPP Server</string>
+<string name="status_message">Status Message</string>
+<string name="server_port">Server Port</string>
 </resources>

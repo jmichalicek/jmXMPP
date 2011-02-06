@@ -154,28 +154,32 @@ public class ContactListView extends ListActivity {
 		@Override
 		protected void onPostExecute(Void a) {
 			mRosterDisplayList.clear();
+			// If we did not connect to the xmpp server first in our service
+			// the mRosterList will be null
+			// could also just check to make sure we're connected to xmpp
+			// before starting this thread
+			if(mRosterList != null) {
+				Iterator<JmRosterEntry> i = mRosterList.iterator();
+				while(i.hasNext()) {
+					JmRosterEntry current = i.next();
 
-			Iterator<JmRosterEntry> i = mRosterList.iterator();
-			while(i.hasNext()) {
-				JmRosterEntry current = i.next();
-				
-				String statusLine = null;
-				statusLine = (current.getPresenceStatus() != null) ? 
-						(!current.getPresenceStatus().equals("") ?
-								current.getPresenceStatus() : "Online") : "Offline";
-				
-				if(current.getPresenceMode() != null) {
-					statusLine += " - " + current.getPresenceMode();
+					String statusLine = null;
+					statusLine = (current.getPresenceStatus() != null) ? 
+							(!current.getPresenceStatus().equals("") ?
+									current.getPresenceStatus() : "Online") : "Offline";
+
+					if(current.getPresenceMode() != null) {
+						statusLine += " - " + current.getPresenceMode();
+					}
+
+					HashMap<String,String> entry = new HashMap<String,String>();
+					entry.put("text1", (current.getName() != null) ?
+							current.getName() : current.getUser());
+					entry.put("text2", statusLine);
+					mRosterDisplayList.add(entry);
+					mRosterAdapter.notifyDataSetChanged();
 				}
-				
-				HashMap<String,String> entry = new HashMap<String,String>();
-				entry.put("text1", (current.getName() != null) ?
-						current.getName() : current.getUser());
-				entry.put("text2", statusLine);
-				mRosterDisplayList.add(entry);
-				mRosterAdapter.notifyDataSetChanged();
 			}
 		}
-		
 	}
 }

@@ -17,8 +17,12 @@
   />
   <EditText android:id="@+id/password_entry"
   	android:layout_width="fill_parent"
-  	android:layout_height="wrap_content" android:inputType="text"/>
+  	android:layout_height="wrap_content" android:inputType="textPassword"/>
 	<Button android:id="@+id/connect_button" android:layout_width="wrap_content"
 		android:layout_height="wrap_content" android:text="@string/connect"
 		android:layout_alignParentRight="true" />
+<CheckBox android:text="@string/save_username" android:id="@+id/save_username_checkbox" 
+	android:layout_width="wrap_content" android:layout_height="wrap_content"></CheckBox>
+<CheckBox android:text="@string/save_password" android:id="@+id/save_password_checkbox"
+	android:layout_width="wrap_content" android:layout_height="wrap_content"></CheckBox>
 </LinearLayout>

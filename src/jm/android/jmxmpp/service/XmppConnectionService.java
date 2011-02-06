@@ -24,6 +24,7 @@ import android.os.RemoteException;
 import org.jivesoftware.smack.Chat;
 import org.jivesoftware.smack.ChatManagerListener;
 import org.jivesoftware.smack.ConnectionConfiguration;
+import org.jivesoftware.smack.ConnectionListener;
 import org.jivesoftware.smack.MessageListener;
 import org.jivesoftware.smack.Roster;
 import org.jivesoftware.smack.RosterEntry;
@@ -33,7 +34,7 @@ import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Presence;
 
-public class XmppConnectionService extends Service {
+public class XmppConnectionService extends Service implements ConnectionListener{
 
 	private XMPPConnection mConnection;
 	private ConnectionConfiguration mConnConfig;
@@ -47,6 +48,8 @@ public class XmppConnectionService extends Service {
 	//because the actual message being stored could be from ourselves TO the person
 	//we are chatting with.
 	private HashMap<String,List<JmMessage>> mQueuedMessages = new HashMap<String,List<JmMessage>>();
+	
+	private static final int NOTIFICATION_CONNECTION_STATUS = 1;
 
 	@Override
 	public IBinder onBind(Intent arg0) {
@@ -66,7 +69,21 @@ public class XmppConnectionService extends Service {
 		
 		String ns = Context.NOTIFICATION_SERVICE;
 		mNotificationManager = (NotificationManager)getSystemService(ns);
-
+		
+		//TODO: This message needs handled by strings.xml
+		//TODO: Make intent disconnect from XMPP and stop service
+		int icon = android.R.drawable.sym_action_chat;
+		CharSequence tickerText = "XMPP Service Started";
+		long when = System.currentTimeMillis();
+		Notification notification = new Notification(icon, tickerText, when);
+		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
+		Intent i = new Intent();
+		PendingIntent contentIntent = PendingIntent.getActivity(
+				XmppConnectionService.this, 0, i, 0);
+		notification.setLatestEventInfo(getApplicationContext(),
+				"jmXMPP Connected", "Click to disconnect", contentIntent);
+		mNotificationManager.notify(NOTIFICATION_CONNECTION_STATUS,notification);
+		
 	}
 	
 	@Override
@@ -92,6 +109,61 @@ public class XmppConnectionService extends Service {
 		}
 		
 		mQueuedMessages.get(user).add(message);
+	}
+	
+	//Listener interfaces
+	@Override
+	public void connectionClosed() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void connectionClosedOnError(Exception arg0) {
+		//TODO: strings here from strings.xml
+		//TODO: Intent to stop reconnection attempts?
+		int icon = android.R.drawable.sym_action_chat;
+		CharSequence tickerText = "jmXMPP Connection Lost";
+		long when = System.currentTimeMillis();
+		Notification notification = new Notification(icon, tickerText, when);
+		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
+		Intent i = new Intent();
+		PendingIntent contentIntent = PendingIntent.getActivity(
+				XmppConnectionService.this, 0, i, 0);
+		notification.setLatestEventInfo(getApplicationContext(),
+				"jmXMPP Reconnecting", "Click to cancel", contentIntent);
+		mNotificationManager.notify(NOTIFICATION_CONNECTION_STATUS,notification);
+	}
+
+	@Override
+	public void reconnectingIn(int arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void reconnectionFailed(Exception arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void reconnectionSuccessful() {
+		// TODO: This is done a couple times... move to own method?
+		//TODO: This message needs handled by strings.xml
+		//TODO: Make intent disconnect from XMPP and stop service
+		int icon = android.R.drawable.sym_action_chat;
+		CharSequence tickerText = "XMPP Service Started";
+		long when = System.currentTimeMillis();
+		Notification notification = new Notification(icon, tickerText, when);
+		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
+		Intent i = new Intent();
+		PendingIntent contentIntent = PendingIntent.getActivity(
+				XmppConnectionService.this, 0, i, 0);
+		notification.setLatestEventInfo(getApplicationContext(),
+				"jmXMPP Connected", "Click to disconnect", contentIntent);
+		mNotificationManager.notify(NOTIFICATION_CONNECTION_STATUS,notification);
+		
 	}
 	
 	// Listeners
@@ -294,19 +366,17 @@ public class XmppConnectionService extends Service {
 				mConnConfig =
 		    		new ConnectionConfiguration(host, port,"gmail.com");
 				mConnection = new XMPPConnection(mConnConfig);
-		        boolean connected = false;
 		        try {
 		            mConnection.connect();
 		            System.out.println("Connected!");
-		            connected = true;
 		        } catch (XMPPException ex) {
 		        	System.err.println(ex.getMessage());
 		        	RemoteException e = new RemoteException();
 		        	e.initCause(ex);
 		        	throw e;
 		        }
-		        
-		        return connected;
+
+		        return mConnection.isConnected();
 			}
 
 			/**
@@ -340,6 +410,9 @@ public class XmppConnectionService extends Service {
 			@Override
 			public List<jm.android.jmxmpp.JmRosterEntry> getRoster() throws RemoteException {
 				//Roster roster = mConnection.getRoster();
+				if(mRoster == null){
+					return null;
+				}
 				Collection<RosterEntry> rosterEntries = mRoster.getEntries();
 				Iterator<RosterEntry> i = rosterEntries.iterator();
 

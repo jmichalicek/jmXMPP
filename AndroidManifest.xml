@@ -22,6 +22,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
 			</intent-filter>
 		</activity>
+		<activity android:name=".PreferencesEditor">
+		</activity>
 		<service android:enabled="true" android:name=".service.XmppConnectionService">
 			<intent-filter>
 				<action android:name="jm.android.jmxmpp.service.XmppConnectionService" />

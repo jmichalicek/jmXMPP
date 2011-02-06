@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+  xmlns:android="http://schemas.android.com/apk/res/android">
+<EditTextPreference android:key="xmpp_server" android:defaultValue="talk.google.com" android:title="@string/xmpp_server" android:summary="The chat server you connect to"></EditTextPreference>
+
+<EditTextPreference android:key="server_port" android:defaultValue="5222" android:title="@string/server_port" android:summary="The port for your server"></EditTextPreference>
+
+<EditTextPreference android:key="status_message" android:title="@string/status_message" android:summary="What are you doing right now?"></EditTextPreference>
+</PreferenceScreen>
