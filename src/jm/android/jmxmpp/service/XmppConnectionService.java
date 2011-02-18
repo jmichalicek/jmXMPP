@@ -33,6 +33,7 @@ import org.jivesoftware.smack.XMPPConnection;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Presence;
+import org.jivesoftware.smack.packet.XMPPError;
 
 public class XmppConnectionService extends Service implements ConnectionListener{
 
@@ -354,7 +355,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 			
 			@Override
 			public void disconnect() throws RemoteException {
-				
+				//TODO: Stop the service?
+				mConnection.disconnect();
 			}
 			
 			/**
@@ -488,6 +490,11 @@ public class XmppConnectionService extends Service implements ConnectionListener
 				}
 				
 				mQueuedMessages.put(from, messageList);
+			}
+
+			@Override
+			public boolean isConnected() throws RemoteException {
+				return mConnection.isConnected();
 			}
 
 	};

@@ -2,9 +2,12 @@ package jm.android.jmxmpp;
 
 import jm.android.jmxmpp.service.IXmppConnectionService;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
@@ -39,6 +42,9 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	private static final String DEFAULT_SERVER = "talk.google.com";
 	private static final String DEFAULT_PORT = "5222";
 	
+	private static final int DIALOG_CONNECTION_ERROR = 0;
+	private static final int DIALOG_INVALID_LOGIN = 1;
+	
 	@Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -66,6 +72,34 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
     protected void onStop(){
        super.onStop();
        savePrefs();
+	}
+	
+	@Override
+	protected Dialog onCreateDialog(int id) {
+		switch(id) {
+		case DIALOG_CONNECTION_ERROR:
+			return new AlertDialog.Builder(this)
+            .setIcon(R.drawable.icon)
+            .setTitle(R.string.connection_error)
+            .setMessage(R.string.connection_error)
+            .setNegativeButton(R.string.ok, new DialogInterface.OnClickListener() {
+            	public void onClick(DialogInterface dialog, int id) {
+                    dialog.cancel();
+            	}
+            })
+            .create();
+		case DIALOG_INVALID_LOGIN:
+			return new AlertDialog.Builder(this)
+			.setIcon(R.drawable.icon)
+			.setTitle(R.string.connection_error)
+			.setMessage(R.string.invalid_login)
+			.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int id) {
+					dialog.cancel();
+				}
+			}).create();
+		}
+		return null;
 	}
 	
 	@Override
@@ -179,8 +213,11 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	//Thread for connecting to the xmpp server
 	private class ConnectThread extends AsyncTask<Void, Void, Boolean> {
 		ProgressDialog progressDialog;
+		Integer errorDialog = null;
+		
 		@Override
 		protected void onPreExecute() {
+			//TODO: Figure out how to use strings from strings.xml here
 			progressDialog = ProgressDialog.show(ConnectView.this,
 					"Connecting", "Logging in to server", true, false);
 			progressDialog.show();
@@ -188,26 +225,37 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 
 		@Override
 		protected Boolean doInBackground(Void... arg0) {
-			Boolean success = false;
 			try {
-				success = mConnectionService.connect(mHostname, mPort);
-				if(success) {
-					success = mConnectionService.login(usernameEntry.getText().toString(),
-						passwordEntry.getText().toString());
+				if(mConnectionService.connect(mHostname, mPort)) {
+					return mConnectionService.login(usernameEntry.getText().toString(),
+							passwordEntry.getText().toString());
 				}
 			} catch (RemoteException e) {
-				// TODO: properly handle exception
-				e.printStackTrace();
+				/* This seems like a bad way to handle this
+				 * but due to using aidl it's always going to be a RemoteException
+				 * so I have to check the message to see what the problem actually is.
+				 */
+				if(e.getCause().toString() != null &&
+						e.getCause().toString()
+						.equalsIgnoreCase("SASL authentication failed using mechanism PLAIN: ")) {
+					errorDialog = DIALOG_INVALID_LOGIN;
+				} else {
+					errorDialog = DIALOG_CONNECTION_ERROR;
+				}
 			}
 			
-			return success;
+			return false;
 		}
 		
 		@Override
 		protected void onPostExecute(Boolean loggedIn) {
 			progressDialog.dismiss();
-			Intent i = new Intent("jm.android.jmxmpp.SHOW_CONTACT_LIST");
-			startActivity(i);
+			if(loggedIn) {
+				Intent i = new Intent("jm.android.jmxmpp.SHOW_CONTACT_LIST");
+				startActivity(i);
+			} else {
+				showDialog(errorDialog);
+			}
 		}
 	}
 

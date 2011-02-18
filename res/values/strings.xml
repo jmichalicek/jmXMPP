@@ -13,4 +13,9 @@
 <string name="xmpp_server">XMPP Server</string>
 <string name="status_message">Status Message</string>
 <string name="server_port">Server Port</string>
+<string name="connection_error">Error Connecting To Server</string>
+<string name="ok">Ok</string>
+<string name="invalid_login">Incorrect username or password</string>
+<string name="connecting">Connecting</string>
+<string name="connecting_to_server">Connecting to server</string>
 </resources>
