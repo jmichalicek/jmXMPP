@@ -137,6 +137,8 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	public ServiceConnection mConnection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName className, IBinder service) {
+			//TODO: Just get reference to the service from the IBinder
+			// which requires changes in the service, too
 			mConnectionService = IXmppConnectionService.Stub.asInterface(service);
 			if(mConnectionService != null) {
 				ConnectThread cThread = new ConnectThread();
@@ -152,18 +154,15 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	
 	private void connectToServer() {
 		if(!startedService) {
+			//use startService() first so that the lifetime of the service
+			//is not tied to this activity
 			startService(new Intent(this,jm.android.jmxmpp.service.XmppConnectionService.class));
 			startedService = true;
 			
 			// Maybe should make this an explicit
 			bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
 					mConnection,Context.BIND_AUTO_CREATE);
-		} else {
-			//TODO: Remove this before any real launch and add a proper disconnect method
-			stopService(new Intent(this,jm.android.jmxmpp.service.XmppConnectionService.class));
-			startedService = false;
 		}
-		
 	}
 	
 	private void populateFields() {
@@ -217,7 +216,7 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 		
 		@Override
 		protected void onPreExecute() {
-			//TODO: Figure out how to use strings from strings.xml here
+			//TODO: Use strings from strings.xml here
 			progressDialog = ProgressDialog.show(ConnectView.this,
 					"Connecting", "Logging in to server", true, false);
 			progressDialog.show();

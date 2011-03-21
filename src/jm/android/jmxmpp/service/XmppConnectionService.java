@@ -1,5 +1,6 @@
 package jm.android.jmxmpp.service;
-
+//TODO: Update this so that UI activities can just get references to the service
+// rather than using AIDL
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -76,15 +78,19 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		int icon = android.R.drawable.sym_action_chat;
 		CharSequence tickerText = "XMPP Service Started";
 		long when = System.currentTimeMillis();
+		
 		Notification notification = new Notification(icon, tickerText, when);
-		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
-		Intent i = new Intent();
-		PendingIntent contentIntent = PendingIntent.getActivity(
+		notification.flags = 
+			Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
+		Intent i = new Intent("jm.android.jmxmpp.STOP_CONNECTION_SERVICE");
+		PendingIntent contentIntent = PendingIntent.getBroadcast(
 				XmppConnectionService.this, 0, i, 0);
 		notification.setLatestEventInfo(getApplicationContext(),
 				"jmXMPP Connected", "Click to disconnect", contentIntent);
 		mNotificationManager.notify(NOTIFICATION_CONNECTION_STATUS,notification);
 		
+		registerReceiver(stopConnectionServiceReceiver,
+				new IntentFilter("jm.android.jmxmpp.STOP_CONNECTION_SERVICE"));
 	}
 	
 	@Override
@@ -122,7 +128,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	@Override
 	public void connectionClosedOnError(Exception arg0) {
 		//TODO: strings here from strings.xml
-		//TODO: Intent to stop reconnection attempts?
+		//TODO: Intent to stop reconnection attempts does not exist
+		//or do anything yet
 		int icon = android.R.drawable.sym_action_chat;
 		CharSequence tickerText = "jmXMPP Connection Lost";
 		long when = System.currentTimeMillis();
@@ -158,8 +165,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		long when = System.currentTimeMillis();
 		Notification notification = new Notification(icon, tickerText, when);
 		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
-		Intent i = new Intent();
-		PendingIntent contentIntent = PendingIntent.getActivity(
+		Intent i = new Intent("jm.android.jmxmpp.STOP_CONNECTION_SERVICE");
+		PendingIntent contentIntent = PendingIntent.getBroadcast(
 				XmppConnectionService.this, 0, i, 0);
 		notification.setLatestEventInfo(getApplicationContext(),
 				"jmXMPP Connected", "Click to disconnect", contentIntent);
@@ -168,6 +175,15 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	}
 	
 	// Listeners
+	BroadcastReceiver stopConnectionServiceReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context arg0, Intent intent) {
+			mConnection.disconnect();
+			stopSelf();
+			mNotificationManager.cancel(NOTIFICATION_CONNECTION_STATUS);
+		}		
+	};
+	
 	BroadcastReceiver sendMessageResultReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context arg0, Intent intent) {
