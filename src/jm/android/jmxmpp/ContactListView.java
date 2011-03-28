@@ -8,13 +8,20 @@ package jm.android.jmxmpp;
  */
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-import jm.android.jmxmpp.service.IXmppConnectionService;
+import org.jivesoftware.smack.Roster;
+import org.jivesoftware.smack.RosterEntry;
+import org.jivesoftware.smack.packet.Presence;
+
+import jm.android.jmxmpp.service.XmppConnectionService;
+import jm.android.jmxmpp.service.XmppConnectionService.LocalBinder;
+
 import android.app.ListActivity;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -25,7 +32,6 @@ import android.content.ServiceConnection;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
@@ -34,15 +40,15 @@ import android.widget.AdapterView.OnItemClickListener;
 
 public class ContactListView extends ListActivity {
 	
-	IXmppConnectionService mConnectionService = null;
- 	List<JmRosterEntry> mRosterList = null; // parallel to ArrayAdapter
+	XmppConnectionService mConnectionService = null;
+	List<RosterEntry> mRosterList = new ArrayList<RosterEntry>();
  	List<HashMap<String,String>> mRosterDisplayList = new ArrayList<HashMap<String,String>>();
  	private SimpleAdapter mRosterAdapter = null;
 	
-	private static final Comparator<JmRosterEntry> ROSTER_NAME_ORDER =
-		new Comparator<JmRosterEntry>() {
+ 	private static final Comparator<RosterEntry> ROSTER_NAME_ORDER =
+		new Comparator<RosterEntry>() {
 			@Override
-			public int compare(JmRosterEntry arg0, JmRosterEntry arg1) {
+			public int compare(RosterEntry arg0, RosterEntry arg1) {
 				String compare1 = (arg0.getName() != null) ? arg0.getName()
 						: arg0.getUser();
 				String compare2 = (arg1.getName() != null) ? arg1.getName()
@@ -77,8 +83,8 @@ public class ContactListView extends ListActivity {
 	private ServiceConnection mConnection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName className, IBinder service) {
-			mConnectionService = IXmppConnectionService.Stub.asInterface(service);
-			
+			LocalBinder binder = (LocalBinder)service;
+			mConnectionService = binder.getService();
 			//After logging in a ROSTER_UPDATED intent is received
 			//but sometimes it comes before this activity is ready to receive
 			//so manually update now to be safe
@@ -105,7 +111,7 @@ public class ContactListView extends ListActivity {
 	private void startChat(int position) {
 			Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
 			i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
-			i.putExtra("participant", this.mRosterList.get(position));
+			i.putExtra("participant", this.mRosterList.get(position).getUser());
 			startActivity(i);
 	}
 	
@@ -136,49 +142,63 @@ public class ContactListView extends ListActivity {
 	};
 	
 	// Threads
-	private class UpdateRosterThread extends AsyncTask<Void,Void,Void> {
+	private class UpdateRosterThread extends AsyncTask<Void,Void,Roster> {
 		@Override
-		protected Void doInBackground(Void... arg0) {
-			try {
-				mRosterList = mConnectionService.getRoster();
-			} catch (RemoteException e) {
-				e.printStackTrace();
+		protected Roster doInBackground(Void... arg0) {
+			Roster testRoster = null;
+			testRoster = mConnectionService.getRoster();
+			Collection<RosterEntry> entries = testRoster.getEntries();
+			//mRosterList = Arrays.asList((RosterEntry[])entries.toArray());
+			
+			/* It's much more compact to just extract the arraylist directly as above
+			 * but that is resulting in errors, I believe due to a lack of thread safety
+			 */
+			Iterator<RosterEntry> i = entries.iterator();
+			mRosterList.clear();
+			while(i.hasNext()) {
+				RosterEntry currentEntry = i.next();
+				mRosterList.add(currentEntry);
 			}
 			
 			if(mRosterList != null && mRosterList.size() > 0) {
 				Collections.sort(mRosterList, ROSTER_NAME_ORDER);
 			}
-			return null;
+			return testRoster;
 		}
 		
 		@Override
-		protected void onPostExecute(Void a) {
+		protected void onPostExecute(Roster roster) {
 			mRosterDisplayList.clear();
+
 			// If we did not connect to the xmpp server first in our service
 			// the mRosterList will be null
 			// could also just check to make sure we're connected to xmpp
 			// before starting this thread
 			if(mRosterList != null) {
-				Iterator<JmRosterEntry> i = mRosterList.iterator();
+				Iterator<RosterEntry> i = mRosterList.iterator();
 				while(i.hasNext()) {
-					JmRosterEntry current = i.next();
-
-					String statusLine = null;
-					statusLine = (current.getPresenceStatus() != null) ? 
-							(!current.getPresenceStatus().equals("") ?
-									current.getPresenceStatus() : "Online") : "Offline";
-
-					if(current.getPresenceMode() != null) {
-						statusLine += " - " + current.getPresenceMode();
-					}
-
+					RosterEntry current = i.next();
+					
 					HashMap<String,String> entry = new HashMap<String,String>();
+					
+					String statusLine = "Offline";
+					Presence presence = roster.getPresence(current.getUser());
+					
+					if(presence.getStatus() != null) {
+						statusLine = (presence.getStatus().equals("") ? 
+								"Online" : presence.getStatus());
+					}
+									
+					if(presence.getMode() != null && 
+							!presence.getMode().equals("")) {
+						statusLine += " - " + presence.getMode();
+					}
 					entry.put("text1", (current.getName() != null) ?
 							current.getName() : current.getUser());
 					entry.put("text2", statusLine);
 					mRosterDisplayList.add(entry);
-					mRosterAdapter.notifyDataSetChanged();
 				}
+				mRosterAdapter.notifyDataSetChanged();
 			}
 		}
 	}

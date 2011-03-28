@@ -1,6 +1,8 @@
 package jm.android.jmxmpp;
 
 import jm.android.jmxmpp.service.IXmppConnectionService;
+import jm.android.jmxmpp.service.XmppConnectionService;
+import jm.android.jmxmpp.service.XmppConnectionService.LocalBinder;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -14,6 +16,7 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.AsyncTask;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -34,7 +37,8 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	CheckBox savePasswordCheckbox;
 	
 	Boolean startedService = false;
-	IXmppConnectionService mConnectionService = null;
+	//IXmppConnectionService mConnectionService = null;
+	XmppConnectionService mConnectionService = null;
 	
 	String mHostname;
 	int mPort;
@@ -65,7 +69,16 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         prefs.registerOnSharedPreferenceChangeListener(this);
         populateFields();
-
+        
+        //Start service
+      //use startService() first so that the lifetime of the service
+		//is not tied to this activity
+		startService(new Intent(this,jm.android.jmxmpp.service.XmppConnectionService.class));
+		startedService = true;
+		
+		// Maybe should make this an explicit
+		bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
+				mConnection,Context.BIND_AUTO_CREATE);
     }
 	
 	@Override
@@ -139,11 +152,21 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 		public void onServiceConnected(ComponentName className, IBinder service) {
 			//TODO: Just get reference to the service from the IBinder
 			// which requires changes in the service, too
-			mConnectionService = IXmppConnectionService.Stub.asInterface(service);
+			
+			//mConnectionService = IXmppConnectionService.Stub.asInterface(service);
+			LocalBinder binder = (LocalBinder)service;
+			mConnectionService = binder.getService();
+			
+			if(mConnectionService != null && mConnectionService.isAuthenticated()) {
+				Intent i = new Intent("jm.android.jmxmpp.SHOW_CONTACT_LIST");
+				startActivity(i);
+			}
+			
+			/*
 			if(mConnectionService != null) {
 				ConnectThread cThread = new ConnectThread();
 				cThread.execute();
-			}
+			}*/
 		}
 
 		@Override
@@ -153,6 +176,11 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	};
 	
 	private void connectToServer() {
+		if(mConnectionService != null) {
+			ConnectThread cThread = new ConnectThread();
+			cThread.execute();
+		}
+		/*
 		if(!startedService) {
 			//use startService() first so that the lifetime of the service
 			//is not tied to this activity
@@ -162,7 +190,7 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 			// Maybe should make this an explicit
 			bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
 					mConnection,Context.BIND_AUTO_CREATE);
-		}
+		}*/
 	}
 	
 	private void populateFields() {

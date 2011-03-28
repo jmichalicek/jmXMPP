@@ -4,6 +4,16 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+/**
+ * 
+ * @author Justin Michalicek
+ *
+ * Class to hold data from asmack Message objects
+ * since they are not parcelable and a parcelable class is needed
+ * for attaching to Intent objects.  aidl interface still exists
+ * but should no longer be needed
+ */
+
 public class JmMessage implements Parcelable {
 	private String from;
 	private String text;

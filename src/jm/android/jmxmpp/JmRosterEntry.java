@@ -1,4 +1,5 @@
 package jm.android.jmxmpp;
+//Deprecated
 
 /** This class holds info to match up to 
  *  org.jivesoftware.smack.RosterEntry since it is not parcelable
@@ -9,6 +10,17 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+/**
+ * 
+ * @author Justin Michalicek
+ *
+ */
+/**
+ * @deprecated
+ * This was a simple class to hold required RosterEntry data
+ * but now this is not required since the client no longer uses aidl
+ */
+@Deprecated
 public class JmRosterEntry implements Parcelable {
 	String mName;
 	String mUser;

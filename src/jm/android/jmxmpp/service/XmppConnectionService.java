@@ -1,6 +1,8 @@
 package jm.android.jmxmpp.service;
 //TODO: Update this so that UI activities can just get references to the service
 // rather than using AIDL
+//TODO: Above seems to be done and working, but now need to update methods
+// to just return asmack objects such as Roster rather than the simple wrappers
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -8,7 +10,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import jm.android.jmxmpp.JmMessage;
-import jm.android.jmxmpp.JmRosterEntry;
 
 import android.app.Activity;
 import android.app.Notification;
@@ -19,6 +20,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -35,7 +37,6 @@ import org.jivesoftware.smack.XMPPConnection;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Presence;
-import org.jivesoftware.smack.packet.XMPPError;
 
 public class XmppConnectionService extends Service implements ConnectionListener{
 
@@ -43,6 +44,126 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	private ConnectionConfiguration mConnConfig;
 	private Roster mRoster;	
 	private NotificationManager mNotificationManager = null;
+	
+	// Test return reference to the service directly
+	private final IBinder myBinder = new LocalBinder();
+	
+	public class LocalBinder extends Binder {
+        public XmppConnectionService getService() {
+            // Return this instance of LocalService so clients can call public methods
+            return XmppConnectionService.this;
+        }
+	}
+	
+	public boolean login(String username, String password)
+	throws RemoteException {
+
+		try {
+			mConnection.login(username, password);
+			System.out.println("Logged in!");
+		} catch (XMPPException ex) {
+			System.err.println(ex.getMessage());
+			RemoteException e = new RemoteException();
+			e.initCause(ex);
+			throw e;
+		}
+
+		mRoster = mConnection.getRoster();
+		mRoster.addRosterListener(rosterListener);
+
+		mConnection.getChatManager().addChatListener(chatManagerListener);
+
+		return true;
+	}
+	
+	public boolean connect(String host, int port) throws RemoteException {
+		//return connectToServer(host, port);
+		mConnConfig =
+    		new ConnectionConfiguration(host, port,"gmail.com");
+		mConnection = new XMPPConnection(mConnConfig);
+        try {
+            mConnection.connect();
+            System.out.println("Connected!");
+        } catch (XMPPException ex) {
+        	System.err.println(ex.getMessage());
+        	RemoteException e = new RemoteException();
+        	e.initCause(ex);
+        	throw e;
+        }
+
+        return mConnection.isConnected();
+	}
+	
+	public boolean isConnected() {
+		boolean connected = false;
+		if(mConnection != null) {
+			connected = mConnection.isConnected();
+		}
+		return connected;
+	}
+	
+	public boolean isAuthenticated() {
+		boolean authenticated = false;
+		if(mConnection != null) {
+			authenticated = mConnection.isAuthenticated();
+		}
+		return authenticated;
+	}
+	
+	public void sendMessage(String to, String message) throws RemoteException {
+		//Why don't I have map of Chat objects?  Seems like I tried once and it
+		//would not work for some reason.  Try again and comment the issue
+		//if there is one
+		
+		Chat chat = mConnection.getChatManager().createChat(to,
+				null);
+		
+		try {
+			chat.sendMessage(message);
+		} catch (XMPPException ex) {
+			ex.printStackTrace();
+			System.err.println(ex.getMessage());
+        	RemoteException e = new RemoteException();
+        	e.initCause(ex);
+        	throw e;
+		}
+	}
+	
+	public void clearQueuedMessages(String from) throws RemoteException {
+		mQueuedMessages.remove(from);
+		
+	}
+	
+	public List<JmMessage> getQueuedMessages(String from)
+	throws RemoteException {
+		if(mQueuedMessages.containsKey(from)) {
+			return mQueuedMessages.get(from);
+		}
+		return null;
+	}
+	
+	public void addMessagesToQueue(String from, JmMessage[] messages)
+	throws RemoteException {
+		List<JmMessage> messageList = new ArrayList<JmMessage>();
+
+		if(mQueuedMessages.containsKey(from)) {
+			messageList = mQueuedMessages.get(from);
+		}
+
+		for(JmMessage message: messages) {
+			messageList.add(message);
+		}
+
+		mQueuedMessages.put(from, messageList);
+	}
+	
+	//public List<jm.android.jmxmpp.JmRosterEntry> getRoster() throws RemoteException {
+	public Roster getRoster() {
+		return mRoster;
+	}
+
+	//end test
+
 	
 	//Stores messages when there was no proper BroadcastReceiver
 	//so that a ChatView can display them later
@@ -56,8 +177,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 
 	@Override
 	public IBinder onBind(Intent arg0) {
-		return mBinder;
-		//return null;
+		//return mBinder;
+		return myBinder;
 	}
 
 	@Override
@@ -74,13 +195,12 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		mNotificationManager = (NotificationManager)getSystemService(ns);
 		
 		//TODO: This message needs handled by strings.xml
-		//TODO: Make intent disconnect from XMPP and stop service
 		int icon = android.R.drawable.sym_action_chat;
 		CharSequence tickerText = "XMPP Service Started";
 		long when = System.currentTimeMillis();
 		
 		Notification notification = new Notification(icon, tickerText, when);
-		notification.flags = 
+		notification.flags |= 
 			Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
 		Intent i = new Intent("jm.android.jmxmpp.STOP_CONNECTION_SERVICE");
 		PendingIntent contentIntent = PendingIntent.getBroadcast(
@@ -121,7 +241,7 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	//Listener interfaces
 	@Override
 	public void connectionClosed() {
-		// TODO Auto-generated method stub
+		// TODO Determine if something needs done here
 		
 	}
 
@@ -134,7 +254,7 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		CharSequence tickerText = "jmXMPP Connection Lost";
 		long when = System.currentTimeMillis();
 		Notification notification = new Notification(icon, tickerText, when);
-		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
+		notification.flags |= Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
 		Intent i = new Intent();
 		PendingIntent contentIntent = PendingIntent.getActivity(
 				XmppConnectionService.this, 0, i, 0);
@@ -145,7 +265,7 @@ public class XmppConnectionService extends Service implements ConnectionListener
 
 	@Override
 	public void reconnectingIn(int arg0) {
-		// TODO Auto-generated method stub
+		// TODO Determine if something needs done here
 		
 	}
 
@@ -159,12 +279,11 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	public void reconnectionSuccessful() {
 		// TODO: This is done a couple times... move to own method?
 		//TODO: This message needs handled by strings.xml
-		//TODO: Make intent disconnect from XMPP and stop service
 		int icon = android.R.drawable.sym_action_chat;
 		CharSequence tickerText = "XMPP Service Started";
 		long when = System.currentTimeMillis();
 		Notification notification = new Notification(icon, tickerText, when);
-		notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
+		notification.flags |= Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
 		Intent i = new Intent("jm.android.jmxmpp.STOP_CONNECTION_SERVICE");
 		PendingIntent contentIntent = PendingIntent.getBroadcast(
 				XmppConnectionService.this, 0, i, 0);
@@ -178,7 +297,9 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	BroadcastReceiver stopConnectionServiceReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context arg0, Intent intent) {
-			mConnection.disconnect();
+			if(mConnection != null) {
+				mConnection.disconnect();
+			}
 			stopSelf();
 			mNotificationManager.cancel(NOTIFICATION_CONNECTION_STATUS);
 		}		
@@ -188,24 +309,25 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		@Override
 		public void onReceive(Context arg0, Intent intent) {
 			if(getResultCode() != Activity.RESULT_OK) {
-				JmRosterEntry messageFrom = null;
+				//JmRosterEntry messageFrom = null;
+				String messageFrom = null;
 				JmMessage message = null;
 				Bundle data = intent.getExtras();
 				if(data != null) {
-					messageFrom = data.getParcelable("from");
+					messageFrom = data.getString("from");
 					message = data.getParcelable("message");
 				}
 				
-				queueMessage(messageFrom.getUser(),message);
+				queueMessage(messageFrom,message);
 				String messageText = message.getText();
 				int icon = android.R.drawable.sym_action_chat;
 				CharSequence tickerText = "New XMPP Message";
 				long when = System.currentTimeMillis();
 				Notification notification = new Notification(icon, tickerText, when);
-				notification.flags = Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE |
-					Notification.FLAG_AUTO_CANCEL;
+				notification.flags = notification.defaults;
+				notification.flags |= Notification.FLAG_AUTO_CANCEL;
 				
-				CharSequence contentTitle = "New jmXMPP Message from " + messageFrom.getUser();
+				CharSequence contentTitle = "New jmXMPP Message from " + messageFrom;
 				int messageLength = 15;
 				if(messageText.length() <= 15) {
 					messageLength = messageText.length();
@@ -226,7 +348,10 @@ public class XmppConnectionService extends Service implements ConnectionListener
 				//there will be a new notification per new source, but if that source
 				//sends multiple messages, the notification for them will just update
 				//with the latest message
-				int notificationId = messageFrom.getUser().hashCode();
+				//This needs to be an int due to NotificationManager.notify() so the
+				//hashcode is used rather than the username.
+				//int notificationId = messageFrom.getUser().hashCode();
+				int notificationId = messageFrom.hashCode();
 				mNotificationManager.notify(notificationId, notification);
 			}
 		}
@@ -235,48 +360,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	ChatManagerListener chatManagerListener = new ChatManagerListener() {
 		@Override
 		public void chatCreated(Chat arg0, boolean createdLocally) {
-				//RosterEntry re = findRosterEntryByUser(arg0.getParticipant());
 				//TODO: Handle chat from people NOT in the roster
-				//if(re == null) {
-				//	return;
-				//}
-				
 				arg0.addMessageListener(messageListener);
-				
-				/*
-				String status = null;
-
-				if(re.getStatus() != null) {
-					status = re.getStatus().toString();
-				}
-				
-				Presence presence = mRoster.getPresence(re.getUser());
-				String pStatus = null;
-				String pMode = null;
-				if(presence != null) {
-					pStatus = presence.getStatus();
-					pMode = presence.getMode() == null ? null : presence.getMode().toString();
-				}
-				
-				JmRosterEntry creator = new JmRosterEntry(re.getName(),
-						re.getStatus().toString(),
-						status,null,pStatus,pMode);
-				*/
-				//TODO: This should ask if we want to chat with this person
-				// not just pop up the chat activity.  For the moment the app
-				// will be rude about it, though.
-				/*Intent i = new Intent("jm.android.jmxmpp.START_CHAT");
-				i.putExtra("thread_id", arg0.getThreadID());
-				i.putExtra("participant", creator);
-				
-				startActivity(i);*/
-				
-				//Intent i = new Intent();
-				//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
-				//i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
-				//i.putExtra("from", creator);
-				//i.putExtra("message",message.getBody());
-				//sendBroadcast(i);
 		}
 	};
 
@@ -286,33 +371,14 @@ public class XmppConnectionService extends Service implements ConnectionListener
 			if(message.getType() == Message.Type.chat) {
 				RosterEntry re = findRosterEntryByUser(chat.getParticipant());
 				//TODO: Handle chat from people NOT in the roster
-				if(re != null) {
-					String status = null;
-					if(re.getStatus() != null) {
-						status = re.getStatus().toString();
-					}
-
-					Presence presence = mRoster.getPresence(re.getUser());
-					String pStatus = null;
-					String pMode = null;
-					if(presence != null) {
-						pStatus = presence.getStatus();
-						pMode = presence.getMode() == null ? null : presence.getMode().toString();
-					}
-
-					JmRosterEntry participant = new JmRosterEntry(re.getName(),
-							re.getUser(),
-							status,null,pStatus,pMode);
-
+				if(re != null) {					
 					Intent i = new Intent();
-					//i.setClassName("jm.android.jmxmpp", "jm.android.jmxmpp.ChatView");
 					i.setAction("jm.android.jmxmpp.INCOMING_MESSAGE");
 					// A bit redundant due to the JmMessage but for now
 					// just make it work, it's not a huge problem
-					i.putExtra("from", participant);
-					//i.putExtra("message",message.getBody());
-					String sender = (participant.getName() != null) ?
-							participant.getName() : participant.getUser();
+					i.putExtra("from", re.getUser());
+					String sender = (re.getName() != null) ?
+							re.getName() : re.getUser();
 					i.putExtra("message", 
 							new JmMessage(sender,message.getBody()));
 					// Send broadcast and expect result back.  If no result then
@@ -352,9 +418,6 @@ public class XmppConnectionService extends Service implements ConnectionListener
 			// maybe some day null getFrom() will be useful?
 			// or maybe it's optional but is always included in real world use
 			if(presence.getFrom() != null) {
-				/* For now just use one receiver for all roster updates
-				 * later more specific receivers/broadcasts may need implemented.
-				 */
 				Intent i = new Intent("jm.android.jmxmpp.ROSTER_UPDATED");
 				sendBroadcast(i);
 			}		
@@ -362,156 +425,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		
 		@Override
 		public void entriesAdded(Collection<String> arg0) {
-			
+			Intent i = new Intent("jm.android.jmxmpp.ROSTER_UPDATED");
+			sendBroadcast(i);
 		}
-	};
-	
-	public final IXmppConnectionService.Stub mBinder
-		= new IXmppConnectionService.Stub() {
-			
-			@Override
-			public void disconnect() throws RemoteException {
-				//TODO: Stop the service?
-				mConnection.disconnect();
-			}
-			
-			/**
-			 * Connects to xmpp server
-			 */
-			@Override
-			public boolean connect(String host, int port) throws RemoteException {
-				//return connectToServer(host, port);
-				mConnConfig =
-		    		new ConnectionConfiguration(host, port,"gmail.com");
-				mConnection = new XMPPConnection(mConnConfig);
-		        try {
-		            mConnection.connect();
-		            System.out.println("Connected!");
-		        } catch (XMPPException ex) {
-		        	System.err.println(ex.getMessage());
-		        	RemoteException e = new RemoteException();
-		        	e.initCause(ex);
-		        	throw e;
-		        }
-
-		        return mConnection.isConnected();
-			}
-
-			/**
-			 * Logs into xmpp server and gets initial roster for service
-			 */
-			@Override
-			public boolean login(String username, String password)
-					throws RemoteException {
-				
-				try {
-		            mConnection.login(username, password);
-		            System.out.println("Logged in!");
-		        } catch (XMPPException ex) {
-		        	System.err.println(ex.getMessage());
-		        	RemoteException e = new RemoteException();
-		        	e.initCause(ex);
-		        	throw e;
-		        }
-		        
-		        mRoster = mConnection.getRoster();
-		        mRoster.addRosterListener(rosterListener);
-		        
-		        mConnection.getChatManager().addChatListener(chatManagerListener);
-		        
-		        return true;
-			}
-			
-			/**
-			 * Looks at service's roster and returns List<JmRosterEntry>
-			 */
-			@Override
-			public List<jm.android.jmxmpp.JmRosterEntry> getRoster() throws RemoteException {
-				//Roster roster = mConnection.getRoster();
-				if(mRoster == null){
-					return null;
-				}
-				Collection<RosterEntry> rosterEntries = mRoster.getEntries();
-				Iterator<RosterEntry> i = rosterEntries.iterator();
-
-				List<jm.android.jmxmpp.JmRosterEntry> entryList =
-					new ArrayList<jm.android.jmxmpp.JmRosterEntry>();
-
-				while(i.hasNext()) {
-					RosterEntry currentEntry = i.next();
-					String status = null;
-
-					if(currentEntry.getStatus() != null) {
-						status = currentEntry.getStatus().toString();
-					}
-					
-					Presence presence = mRoster.getPresence(currentEntry.getUser());
-					String pStatus = null;
-					String pMode = null;
-					if(presence != null) {
-						pStatus = presence.getStatus();
-						pMode = presence.getMode() == null ? null : presence.getMode().toString();
-					}
-					jm.android.jmxmpp.JmRosterEntry temp =
-						new JmRosterEntry(
-								currentEntry.getName(),currentEntry.getUser(),
-								status, null,pStatus,pMode);
-					entryList.add(temp);
-				}
-				return entryList;
-			}
-
-			@Override
-			public void sendMessage(String to, String message) throws RemoteException {
-				Chat chat = mConnection.getChatManager().createChat(to,
-						null);
-				
-				try {
-					chat.sendMessage(message);
-				} catch (XMPPException ex) {
-					ex.printStackTrace();
-					System.err.println(ex.getMessage());
-		        	RemoteException e = new RemoteException();
-		        	e.initCause(ex);
-		        	throw e;
-				}
-			}
-
-			@Override
-			public void clearQueuedMessages(String from) throws RemoteException {
-				mQueuedMessages.remove(from);
-				
-			}
-
-			@Override
-			public List<JmMessage> getQueuedMessages(String from)
-					throws RemoteException {
-				if(mQueuedMessages.containsKey(from)) {
-					return mQueuedMessages.get(from);
-				}
-				return null;
-			}
-
-			@Override
-			public void addMessagesToQueue(String from, JmMessage[] messages)
-					throws RemoteException {
-				List<JmMessage> messageList = new ArrayList<JmMessage>();
-				
-				if(mQueuedMessages.containsKey(from)) {
-					messageList = mQueuedMessages.get(from);
-				}
-				
-				for(JmMessage message: messages) {
-					messageList.add(message);
-				}
-				
-				mQueuedMessages.put(from, messageList);
-			}
-
-			@Override
-			public boolean isConnected() throws RemoteException {
-				return mConnection.isConnected();
-			}
-
 	};
 }

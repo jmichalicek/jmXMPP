@@ -9,7 +9,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-import jm.android.jmxmpp.service.IXmppConnectionService;
+import org.jivesoftware.smack.RosterEntry;
+
+//import jm.android.jmxmpp.service.IXmppConnectionService;
+import jm.android.jmxmpp.service.XmppConnectionService;
+import jm.android.jmxmpp.service.XmppConnectionService.LocalBinder;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -29,9 +33,11 @@ import android.widget.ListView;
 import android.widget.SimpleAdapter;
 
 public class ChatView extends Activity {
-	IXmppConnectionService mConnectionService = null;
+	//IXmppConnectionService mConnectionService = null;
+	XmppConnectionService mConnectionService = null;
 	//Just single user chat for now
-	JmRosterEntry mParticipant = null;
+	//JmRosterEntry mParticipant = null;
+	RosterEntry mParticipant = null;
 	EditText messageEntry = null;
 	ListView chatMessages = null;
 	
@@ -44,10 +50,11 @@ public class ChatView extends Activity {
 		setContentView(R.layout.chat_view);
 		connectToXmppService();
 		
+		/*
 		Intent i = getIntent();
 		if(i != null) {
 			unBundle(i);
-		}
+		}*/
 	
 		//chatMessages = (TextView)findViewById(R.id.chat_messages);
 		chatMessages = (ListView)findViewById(R.id.chat_messages);
@@ -72,7 +79,9 @@ public class ChatView extends Activity {
 	
 	@Override
 	protected void onRestoreInstanceState(Bundle savedInstanceState){
-		this.mParticipant = savedInstanceState.getParcelable("participant");
+		//this.mParticipant = savedInstanceState.getParcelable("participant");
+		String temp = savedInstanceState.getString("participant");
+		this.mParticipant = mConnectionService.getRoster().getEntry(temp);
 		//this.chatMessages.setText(savedInstanceState.getString("messages"));
 		
 		super.onRestoreInstanceState(savedInstanceState);
@@ -80,7 +89,8 @@ public class ChatView extends Activity {
 	
 	@Override
 	protected void onSaveInstanceState(Bundle outState) {
-		outState.putParcelable("participant", mParticipant);
+		//outState.putParcelable("participant", mParticipant);
+		outState.putString("participant", mParticipant.getUser());
 		//outState.putString("messages", chatMessages.getText().toString());
 		super.onSaveInstanceState(outState);
 	}
@@ -108,7 +118,7 @@ public class ChatView extends Activity {
 		try {
 			mConnectionService.addMessagesToQueue(mParticipant.getUser(), messages);
 		} catch (RemoteException e) {
-			// TODO Auto-generated catch block
+			// TODO Add some sort of proper handling here
 			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -118,7 +128,9 @@ public class ChatView extends Activity {
 	private void unBundle(Intent intent) {
 		Bundle data = intent.getExtras();
 		if(data != null) {
-			mParticipant = data.getParcelable("participant");
+			//mParticipant temp = data.getParcelable("participant");
+			String temp = data.getString("participant");
+			mParticipant = mConnectionService.getRoster().getEntry(temp);
 		}
 	}
 
@@ -138,9 +150,14 @@ public class ChatView extends Activity {
 	private ServiceConnection mConnection = new ServiceConnection() {
 		@Override
 		public void onServiceConnected(ComponentName className, IBinder service) {
-			mConnectionService = IXmppConnectionService.Stub.asInterface(service);
+			LocalBinder binder = (LocalBinder)service;
+			mConnectionService = binder.getService();
 
 			if(mConnectionService != null) {
+				Intent i = getIntent();
+				if(i != null) {
+					unBundle(i);
+				}
 				try {
 					List<JmMessage> queuedMessages = 
 						mConnectionService.getQueuedMessages(mParticipant.getUser());
@@ -151,14 +168,14 @@ public class ChatView extends Activity {
 						}
 					}
 				} catch (RemoteException e) {
-					// TODO Auto-generated catch block
+					// TODO Add proper error handling
 					e.printStackTrace();
 				}
 				
 				try {
 					mConnectionService.clearQueuedMessages(mParticipant.getUser());
 				} catch (RemoteException e) {
-					// TODO Auto-generated catch block
+					// TODO Add proper error handling
 					e.printStackTrace();
 				}
 			}
@@ -185,11 +202,11 @@ public class ChatView extends Activity {
 		public void onReceive(Context arg0, Intent intent) {
 			Bundle data = intent.getExtras();
 			if(data != null) {
-				JmRosterEntry from = data.getParcelable("from");
-				if(!from.getUser().equals(mParticipant.getUser())) {
+				String from = data.getString("from");
+				if(!from.equals(mParticipant.getUser())) {
 					return;
 				}
-				
+
 				JmMessage message = data.getParcelable("message");
 				addMessageToView(message);
 				setResultCode(Activity.RESULT_OK);
@@ -207,7 +224,7 @@ public class ChatView extends Activity {
 				try {
 					mConnectionService.sendMessage(mParticipant.getUser(), message);
 				} catch (RemoteException e) {
-					// TODO Auto-generated catch block
+					// TODO Add proper error handling
 					e.printStackTrace();
 				}
 			}
