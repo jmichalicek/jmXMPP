@@ -44,6 +44,7 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	private ConnectionConfiguration mConnConfig;
 	private Roster mRoster;	
 	private NotificationManager mNotificationManager = null;
+	int mClientCount = 0;
 	
 	// Test return reference to the service directly
 	private final IBinder myBinder = new LocalBinder();
@@ -55,18 +56,10 @@ public class XmppConnectionService extends Service implements ConnectionListener
         }
 	}
 	
-	public boolean login(String username, String password)
-	throws RemoteException {
+	public boolean login(String username, String password) throws XMPPException {
 
-		try {
-			mConnection.login(username, password);
-			System.out.println("Logged in!");
-		} catch (XMPPException ex) {
-			System.err.println(ex.getMessage());
-			RemoteException e = new RemoteException();
-			e.initCause(ex);
-			throw e;
-		}
+		mConnection.login(username, password);
+		System.out.println("Logged in!");
 
 		mRoster = mConnection.getRoster();
 		mRoster.addRosterListener(rosterListener);
@@ -76,22 +69,15 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		return true;
 	}
 	
-	public boolean connect(String host, int port) throws RemoteException {
+	public boolean connect(String host, int port) throws XMPPException {
 		//return connectToServer(host, port);
 		mConnConfig =
-    		new ConnectionConfiguration(host, port,"gmail.com");
+			new ConnectionConfiguration(host, port,"gmail.com");
 		mConnection = new XMPPConnection(mConnConfig);
-        try {
-            mConnection.connect();
-            System.out.println("Connected!");
-        } catch (XMPPException ex) {
-        	System.err.println(ex.getMessage());
-        	RemoteException e = new RemoteException();
-        	e.initCause(ex);
-        	throw e;
-        }
+		mConnection.connect();
+		System.out.println("Connected!");
 
-        return mConnection.isConnected();
+		return mConnection.isConnected();
 	}
 	
 	public boolean isConnected() {
@@ -110,40 +96,29 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		return authenticated;
 	}
 	
-	public void sendMessage(String to, String message) throws RemoteException {
+	public void sendMessage(String to, String message) throws XMPPException {
 		//Why don't I have map of Chat objects?  Seems like I tried once and it
 		//would not work for some reason.  Try again and comment the issue
 		//if there is one
 		
 		Chat chat = mConnection.getChatManager().createChat(to,
 				null);
-		
-		try {
-			chat.sendMessage(message);
-		} catch (XMPPException ex) {
-			ex.printStackTrace();
-			System.err.println(ex.getMessage());
-        	RemoteException e = new RemoteException();
-        	e.initCause(ex);
-        	throw e;
-		}
+		chat.sendMessage(message);
 	}
 	
-	public void clearQueuedMessages(String from) throws RemoteException {
+	public void clearQueuedMessages(String from) {
 		mQueuedMessages.remove(from);
 		
 	}
 	
-	public List<JmMessage> getQueuedMessages(String from)
-	throws RemoteException {
+	public List<JmMessage> getQueuedMessages(String from) {
 		if(mQueuedMessages.containsKey(from)) {
 			return mQueuedMessages.get(from);
 		}
 		return null;
 	}
 	
-	public void addMessagesToQueue(String from, JmMessage[] messages)
-	throws RemoteException {
+	public void addMessagesToQueue(String from, JmMessage[] messages) {
 		List<JmMessage> messageList = new ArrayList<JmMessage>();
 
 		if(mQueuedMessages.containsKey(from)) {
@@ -177,8 +152,15 @@ public class XmppConnectionService extends Service implements ConnectionListener
 
 	@Override
 	public IBinder onBind(Intent arg0) {
-		//return mBinder;
+		displayServiceNotification();
+		++mClientCount;
 		return myBinder;
+	}
+	
+	@Override
+	public boolean onUnbind(Intent arg0) {
+		--mClientCount;
+		return true;
 	}
 
 	@Override
@@ -193,12 +175,24 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		
 		String ns = Context.NOTIFICATION_SERVICE;
 		mNotificationManager = (NotificationManager)getSystemService(ns);
-		
+		displayServiceNotification();
+		registerReceiver(stopConnectionServiceReceiver,
+				new IntentFilter("jm.android.jmxmpp.STOP_CONNECTION_SERVICE"));
+	}
+	
+	@Override
+	public void onDestroy() {
+		mNotificationManager.cancel(NOTIFICATION_CONNECTION_STATUS);
+	}
+	
+	//TODO: Need to call this if service gets restarted, too
+	//but that doesn't seem to be happening
+	private void  displayServiceNotification() {
 		//TODO: This message needs handled by strings.xml
 		int icon = android.R.drawable.sym_action_chat;
 		CharSequence tickerText = "XMPP Service Started";
 		long when = System.currentTimeMillis();
-		
+
 		Notification notification = new Notification(icon, tickerText, when);
 		notification.flags |= 
 			Notification.DEFAULT_LIGHTS | Notification.DEFAULT_VIBRATE | Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT;
@@ -208,14 +202,6 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		notification.setLatestEventInfo(getApplicationContext(),
 				"jmXMPP Connected", "Click to disconnect", contentIntent);
 		mNotificationManager.notify(NOTIFICATION_CONNECTION_STATUS,notification);
-		
-		registerReceiver(stopConnectionServiceReceiver,
-				new IntentFilter("jm.android.jmxmpp.STOP_CONNECTION_SERVICE"));
-	}
-	
-	@Override
-	public void onDestroy() {
-
 	}
 	
 	private RosterEntry findRosterEntryByUser(String user) {
@@ -301,7 +287,6 @@ public class XmppConnectionService extends Service implements ConnectionListener
 				mConnection.disconnect();
 			}
 			stopSelf();
-			mNotificationManager.cancel(NOTIFICATION_CONNECTION_STATUS);
 		}		
 	};
 	

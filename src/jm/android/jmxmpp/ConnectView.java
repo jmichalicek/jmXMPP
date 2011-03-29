@@ -1,6 +1,7 @@
 package jm.android.jmxmpp;
 
-import jm.android.jmxmpp.service.IXmppConnectionService;
+import org.jivesoftware.smack.XMPPException;
+
 import jm.android.jmxmpp.service.XmppConnectionService;
 import jm.android.jmxmpp.service.XmppConnectionService.LocalBinder;
 import android.app.Activity;
@@ -16,7 +17,6 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.AsyncTask;
-import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -77,8 +77,8 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 		startedService = true;
 		
 		// Maybe should make this an explicit
-		bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
-				mConnection,Context.BIND_AUTO_CREATE);
+		//bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
+		//		mConnection,Context.BIND_AUTO_CREATE);
     }
 	
 	@Override
@@ -162,11 +162,11 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 				startActivity(i);
 			}
 			
-			/*
+			
 			if(mConnectionService != null) {
 				ConnectThread cThread = new ConnectThread();
 				cThread.execute();
-			}*/
+			}
 		}
 
 		@Override
@@ -176,10 +176,13 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 	};
 	
 	private void connectToServer() {
-		if(mConnectionService != null) {
+		startService(new Intent(this,jm.android.jmxmpp.service.XmppConnectionService.class));
+		bindService(new Intent("jm.android.jmxmpp.service.XmppConnectionService"),
+				mConnection,Context.BIND_AUTO_CREATE);
+		/*if(mConnectionService != null) {
 			ConnectThread cThread = new ConnectThread();
 			cThread.execute();
-		}
+		}*/
 		/*
 		if(!startedService) {
 			//use startService() first so that the lifetime of the service
@@ -257,10 +260,9 @@ public class ConnectView extends Activity implements OnSharedPreferenceChangeLis
 					return mConnectionService.login(usernameEntry.getText().toString(),
 							passwordEntry.getText().toString());
 				}
-			} catch (RemoteException e) {
+			} catch (XMPPException e) {
 				/* This seems like a bad way to handle this
-				 * but due to using aidl it's always going to be a RemoteException
-				 * so I have to check the message to see what the problem actually is.
+				 * but XMPPException is a bit vague
 				 */
 				if(e.getCause().toString() != null &&
 						e.getCause().toString()

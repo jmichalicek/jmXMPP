@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.jivesoftware.smack.RosterEntry;
+import org.jivesoftware.smack.XMPPException;
 
 //import jm.android.jmxmpp.service.IXmppConnectionService;
 import jm.android.jmxmpp.service.XmppConnectionService;
@@ -117,9 +118,6 @@ public class ChatView extends Activity {
 		
 		try {
 			mConnectionService.addMessagesToQueue(mParticipant.getUser(), messages);
-		} catch (RemoteException e) {
-			// TODO Add some sort of proper handling here
-			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -158,26 +156,16 @@ public class ChatView extends Activity {
 				if(i != null) {
 					unBundle(i);
 				}
-				try {
-					List<JmMessage> queuedMessages = 
-						mConnectionService.getQueuedMessages(mParticipant.getUser());
+				List<JmMessage> queuedMessages = 
+					mConnectionService.getQueuedMessages(mParticipant.getUser());
 
-					if(queuedMessages != null) {
-						for(JmMessage currentMessage:queuedMessages) {
-							addMessageToView(currentMessage);
-						}
+				if(queuedMessages != null) {
+					for(JmMessage currentMessage:queuedMessages) {
+						addMessageToView(currentMessage);
 					}
-				} catch (RemoteException e) {
-					// TODO Add proper error handling
-					e.printStackTrace();
 				}
 				
-				try {
-					mConnectionService.clearQueuedMessages(mParticipant.getUser());
-				} catch (RemoteException e) {
-					// TODO Add proper error handling
-					e.printStackTrace();
-				}
+				mConnectionService.clearQueuedMessages(mParticipant.getUser());
 			}
 		}
 
@@ -223,10 +211,14 @@ public class ChatView extends Activity {
 				String message = messageEntry.getText().toString();
 				try {
 					mConnectionService.sendMessage(mParticipant.getUser(), message);
-				} catch (RemoteException e) {
+
+				} catch (IllegalStateException e) {
 					// TODO Add proper error handling
 					e.printStackTrace();
-				}
+				} catch (XMPPException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} 
 			}
 			return null;
 		}
