@@ -16,6 +16,7 @@ import org.jivesoftware.smack.XMPPException;
 import jm.android.jmxmpp.service.XmppConnectionService;
 import jm.android.jmxmpp.service.XmppConnectionService.LocalBinder;
 import android.app.Activity;
+import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -25,7 +26,6 @@ import android.content.ServiceConnection;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -57,7 +57,6 @@ public class ChatView extends Activity {
 			unBundle(i);
 		}*/
 	
-		//chatMessages = (TextView)findViewById(R.id.chat_messages);
 		chatMessages = (ListView)findViewById(R.id.chat_messages);
 		messageEntry = (EditText)findViewById(R.id.send_message_input);
 		Button sendButton = (Button)findViewById(R.id.send_message_button);
@@ -75,7 +74,6 @@ public class ChatView extends Activity {
 		
 		registerReceiver(messageBroadcastListener,
 				new IntentFilter("jm.android.jmxmpp.INCOMING_MESSAGE"));
-		
 	}
 	
 	@Override

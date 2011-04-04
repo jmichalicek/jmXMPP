@@ -5,9 +5,12 @@ package jm.android.jmxmpp.service;
 // to just return asmack objects such as Roster rather than the simple wrappers
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import jm.android.jmxmpp.JmMessage;
 
@@ -23,7 +26,6 @@ import android.content.IntentFilter;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
 
 import org.jivesoftware.smack.Chat;
 import org.jivesoftware.smack.ChatManagerListener;
@@ -44,7 +46,9 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	private ConnectionConfiguration mConnConfig;
 	private Roster mRoster;	
 	private NotificationManager mNotificationManager = null;
-	int mClientCount = 0;
+	private int mClientCount = 0;
+	private Set<Integer> mActiveNotifications =
+		Collections.synchronizedSet(new LinkedHashSet<Integer>());
 	
 	// Test return reference to the service directly
 	private final IBinder myBinder = new LocalBinder();
@@ -146,8 +150,7 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	//uses who our conversation is with as the key and then uses JmMessage
 	//because the actual message being stored could be from ourselves TO the person
 	//we are chatting with.
-	private HashMap<String,List<JmMessage>> mQueuedMessages = new HashMap<String,List<JmMessage>>();
-	
+	private HashMap<String,List<JmMessage>> mQueuedMessages = new HashMap<String,List<JmMessage>>();	
 	private static final int NOTIFICATION_CONNECTION_STATUS = 1;
 
 	@Override
@@ -183,6 +186,19 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	@Override
 	public void onDestroy() {
 		mNotificationManager.cancel(NOTIFICATION_CONNECTION_STATUS);
+		
+		synchronized(mActiveNotifications) {
+			Iterator<Integer> i = mActiveNotifications.iterator();
+			while(i.hasNext()) {
+				//It's possible this has already been cleared from the user
+				//clicking on the notification, but clearing it here
+				//does not hurt anything and is simpler than deleting it
+				//out of the Set when it is clicked.
+				Integer notificationId = (Integer)i.next();
+				mNotificationManager.cancel(notificationId);
+			}
+			mActiveNotifications.clear();
+		}
 	}
 	
 	//TODO: Need to call this if service gets restarted, too
@@ -284,7 +300,7 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		@Override
 		public void onReceive(Context arg0, Intent intent) {
 			if(mConnection != null) {
-				mConnection.disconnect();
+				//mConnection.disconnect();
 			}
 			stopSelf();
 		}		
@@ -338,6 +354,9 @@ public class XmppConnectionService extends Service implements ConnectionListener
 				//int notificationId = messageFrom.getUser().hashCode();
 				int notificationId = messageFrom.hashCode();
 				mNotificationManager.notify(notificationId, notification);
+				synchronized(mActiveNotifications) {
+					mActiveNotifications.add(notificationId);
+				}
 			}
 		}
 	};

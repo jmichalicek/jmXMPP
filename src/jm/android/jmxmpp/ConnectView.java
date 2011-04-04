@@ -4,6 +4,7 @@ import org.jivesoftware.smack.XMPPException;
 
 import jm.android.jmxmpp.service.XmppConnectionService;
 import jm.android.jmxmpp.service.XmppConnectionService.LocalBinder;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -19,7 +20,6 @@ import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.preference.PreferenceManager;
 import android.view.Menu;
 import android.view.MenuInflater;
