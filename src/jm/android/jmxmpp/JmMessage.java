@@ -10,8 +10,12 @@ import android.os.Parcelable;
  *
  * Class to hold data from asmack Message objects
  * since they are not parcelable and a parcelable class is needed
- * for attaching to Intent objects.  aidl interface still exists
- * but should no longer be needed
+ * for attaching to Intent objects.  This class is used because
+ * the asmack Message does not keep track of who the message is
+ * from or two, that is tracked separately.  Using this class
+ * makes it much easier to store the messages when needed.
+ * 
+ * aidl interface still exists but should no longer be needed
  */
 
 public class JmMessage implements Parcelable {

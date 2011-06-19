@@ -73,11 +73,25 @@ public class XmppConnectionService extends Service implements ConnectionListener
 		return true;
 	}
 	
+	//TODO: Add servicename to config options
+	//and then create correct ConnectionConfiguration with or without servicename
 	public boolean connect(String host, int port) throws XMPPException {
 		//return connectToServer(host, port);
-		mConnConfig =
-			new ConnectionConfiguration(host, port,"gmail.com");
-		mConnection = new XMPPConnection(mConnConfig);
+		
+		/*
+		 *mConnConfig and the XMPPConnection which uses it are not normally
+		 *needed.  Need to add an "advanced" setting which will use these
+		 *and the appropriate saved settings. 
+		 */
+		//mConnConfig =
+		//	new ConnectionConfiguration(host, port, "gmail.com");
+		//mConnection = new XMPPConnection(mConnConfig);
+		
+		/*
+		 * This is the standard way of connecting which uses
+		 * DNS SRV records to find the correct server and port.
+		 */
+		mConnection = new XMPPConnection(host);
 		mConnection.connect();
 		System.out.println("Connected!");
 
@@ -149,7 +163,8 @@ public class XmppConnectionService extends Service implements ConnectionListener
 	//this may need revisited to deal properly with MUC
 	//uses who our conversation is with as the key and then uses JmMessage
 	//because the actual message being stored could be from ourselves TO the person
-	//we are chatting with.
+	//we are chatting with.  This info is not stored with the message, it is tracked
+	//by who the chat session is with, so using a simple class to track this
 	private HashMap<String,List<JmMessage>> mQueuedMessages = new HashMap<String,List<JmMessage>>();	
 	private static final int NOTIFICATION_CONNECTION_STATUS = 1;
 
