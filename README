@@ -1,0 +1,7 @@
+This is a basic XMPP client for Android.  It supports roster updates,
+incoming chats, and starting chats.  This was a small learning project
+to work with XMPP and running background services on Android so the UI
+is very basic with no frills, but gets the job done. It has only really
+been used on Android 1.6 on my old G1, so your results may vary.
+
+Feel free to clone it and build something nicer out of it.
