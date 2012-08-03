@@ -5,3 +5,6 @@ is very basic with no frills, but gets the job done. It has only really
 been used on Android 1.6 on my old G1, so your results may vary.
 
 Feel free to clone it and build something nicer out of it.
+
+This uses the Android port of the Smack library, so you will need to add
+that to your project.
